@@ -689,8 +689,218 @@ export const DEFAULT_REGISTERED_PUMPS: RegisteredPump[] = [
   },
 ];
 
-// LocalStorage Helper Service
+export interface NeonDbStatus {
+  connected: boolean;
+  status: string;
+  latencyMs?: number;
+  provider?: string;
+  host?: string;
+  database?: string;
+  user?: string;
+  region?: string;
+  serverTime?: string;
+  pgVersion?: string;
+  stats?: {
+    totalStoreKeys: number;
+    totalAuditLogs: number;
+  };
+  lastSyncedAt?: string;
+  isSyncing?: boolean;
+  errorMessage?: string;
+}
+
+// LocalStorage + Neon PostgreSQL Hybrid Storage Service
 class StorageService {
+  private neonStatus: NeonDbStatus = {
+    connected: false,
+    status: 'connecting',
+    isSyncing: false,
+    host: 'ep-icy-bonus-b44dhqg4-pooler.c-6.us-east-2.aws.neon.tech',
+    database: 'neondb',
+    region: 'AWS us-east-2 (Ohio)',
+  };
+
+  private syncTimeout: any = null;
+  private initialized: boolean = false;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        this.initNeonSync();
+      }, 500);
+    }
+  }
+
+  // Get current cached Neon status
+  getNeonStatus(): NeonDbStatus {
+    return this.neonStatus;
+  }
+
+  // Check Neon health & latency via server API
+  async checkNeonStatus(): Promise<NeonDbStatus> {
+    try {
+      const res = await fetch('/api/db/status');
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      this.neonStatus = {
+        ...this.neonStatus,
+        ...data,
+        connected: data.connected === true,
+        status: data.status || (data.connected ? 'active' : 'error'),
+        isSyncing: false,
+      };
+    } catch (err: any) {
+      this.neonStatus = {
+        ...this.neonStatus,
+        connected: false,
+        status: 'disconnected',
+        isSyncing: false,
+        errorMessage: err.message,
+      };
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+    }
+    return this.neonStatus;
+  }
+
+  // Initialize bi-directional synchronization with Neon PostgreSQL
+  async initNeonSync(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    try {
+      this.neonStatus.isSyncing = true;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+      }
+
+      // Check connection
+      await this.checkNeonStatus();
+
+      if (this.neonStatus.connected) {
+        // Fetch all stored records from Neon PostgreSQL
+        const res = await fetch('/api/db/all');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const keys = Object.keys(json.data);
+            if (keys.length > 0) {
+              // Neon has data! Hydrate localStorage with Neon DB state
+              for (const k of keys) {
+                try {
+                  localStorage.setItem(k, JSON.stringify(json.data[k]));
+                } catch (e) {
+                  console.error('Error hydrating key from Neon:', k, e);
+                }
+              }
+              this.neonStatus.lastSyncedAt = new Date().toISOString();
+              this.neonStatus.isSyncing = false;
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('pumppro_data_changed'));
+                window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+              }
+            } else {
+              // Neon DB is empty: seed all initial tables into Neon!
+              await this.syncAllWithNeon();
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('Neon auto-sync note:', err.message);
+      this.neonStatus.isSyncing = false;
+    }
+
+    // Set recurring background status ping every 45s
+    if (typeof window !== 'undefined') {
+      setInterval(() => {
+        this.checkNeonStatus();
+      }, 45000);
+    }
+  }
+
+  // Push all local tables to Neon PostgreSQL (Manual or Initial Seed)
+  async syncAllWithNeon(): Promise<{ success: boolean; message: string }> {
+    this.neonStatus.isSyncing = true;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+    }
+
+    try {
+      const storeBundle = {
+        [STORAGE_KEYS.SETTINGS]: this.getSettings(),
+        [STORAGE_KEYS.RATES]: this.getRates(),
+        [STORAGE_KEYS.NOZZLES]: this.getNozzles(),
+        [STORAGE_KEYS.READINGS]: this.getReadings(),
+        [STORAGE_KEYS.TANKS]: this.getTanks(),
+        [STORAGE_KEYS.LUBRICANTS]: this.getLubricants(),
+        [STORAGE_KEYS.LUBE_SALES]: this.getLubeSales(),
+        [STORAGE_KEYS.LUBE_PURCHASES]: this.getLubePurchases(),
+        [STORAGE_KEYS.CUSTOMERS]: this.getCustomers(),
+        [STORAGE_KEYS.CREDIT_SLIPS]: this.getCreditSlips(),
+        [STORAGE_KEYS.CREDIT_PAYMENTS]: this.getCreditPayments(),
+        [STORAGE_KEYS.EXPENSES]: this.getExpenses(),
+        [STORAGE_KEYS.RECONCILIATIONS]: this.getReconciliations(),
+        [STORAGE_KEYS.SUBSCRIPTION]: this.getSubscription(),
+        [STORAGE_KEYS.REGISTERED_PUMPS]: this.getRegisteredPumps(),
+      };
+
+      const res = await fetch('/api/db/bulk-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store: storeBundle }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        this.neonStatus.connected = true;
+        this.neonStatus.lastSyncedAt = new Date().toISOString();
+        this.neonStatus.isSyncing = false;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+        }
+        return { success: true, message: `Successfully synchronized ${json.keysCount} tables to Neon PostgreSQL!` };
+      } else {
+        throw new Error(json.error || 'Failed to sync');
+      }
+    } catch (err: any) {
+      this.neonStatus.isSyncing = false;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+      }
+      return { success: false, message: `Sync error: ${err.message}` };
+    }
+  }
+
+  // Asynchronously persist single key to Neon
+  private async persistToNeon(key: string, value: any): Promise<void> {
+    try {
+      fetch(`/api/db/set/${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: value }),
+      })
+        .then(r => r.json())
+        .then(json => {
+          if (json.success) {
+            this.neonStatus.connected = true;
+            this.neonStatus.lastSyncedAt = new Date().toISOString();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('pumppro_neon_status', { detail: this.neonStatus }));
+            }
+          }
+        })
+        .catch(err => {
+          console.warn(`Neon persist background sync error for ${key}:`, err.message);
+        });
+    } catch (e) {
+      // Ignore background fetch exceptions
+    }
+  }
+
   private getItem<T>(key: string, defaultValue: T): T {
     try {
       const data = localStorage.getItem(key);
@@ -707,6 +917,9 @@ class StorageService {
       localStorage.setItem(key, JSON.stringify(value));
       // Dispatch storage event for cross-component sync
       window.dispatchEvent(new Event('pumppro_data_changed'));
+
+      // Asynchronously persist to Neon PostgreSQL
+      this.persistToNeon(key, value);
     } catch (e) {
       console.error(`Error saving ${key} to storage:`, e);
     }

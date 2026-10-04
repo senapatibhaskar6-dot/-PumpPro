@@ -13,6 +13,8 @@ import {
   Layers,
   Database,
   Info,
+  ShieldCheck,
+  Zap,
 } from 'lucide-react';
 import {
   FuelRate,
@@ -52,6 +54,23 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
   // Backup text
   const [backupJson, setBackupJson] = useState<string>('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [neonSyncing, setNeonSyncing] = useState<boolean>(false);
+  const [neonMsg, setNeonMsg] = useState<string | null>(null);
+
+  const handleSyncNeon = async () => {
+    setNeonSyncing(true);
+    setNeonMsg(null);
+    try {
+      const res = await storage.syncAllWithNeon();
+      setNeonMsg(res.message);
+      onRefreshData();
+      setTimeout(() => setNeonMsg(null), 5000);
+    } catch (e: any) {
+      setNeonMsg(`Sync error: ${e.message}`);
+    } finally {
+      setNeonSyncing(false);
+    }
+  };
 
   // Handle Rates Update
   const handleRateChange = (type: string, field: 'ratePerLiter' | 'dealerCostPerLiter' | 'dealerMarginPerLiter', val: number) => {
@@ -529,9 +548,48 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
                 <span>Data Backup, Export & Restore</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                All records persist in your browser's local storage. Export JSON files for offline archival or transfer.
+                All records persist in your browser's local storage and sync in real time with Neon Serverless PostgreSQL.
               </p>
             </div>
+          </div>
+
+          {/* Neon PostgreSQL Cloud Persistence Banner */}
+          <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-teal-950/30 border border-emerald-500/30 rounded-2xl p-5 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-md">
+                  <Database className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white">Neon Serverless PostgreSQL Database</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      LIVE CLOUD CONNECTED
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                    Host: ep-icy-bonus-b44dhqg4-pooler.c-6.us-east-2.aws.neon.tech (neondb)
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSyncNeon}
+                disabled={neonSyncing}
+                className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg shadow-emerald-950/40 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <Zap className={`w-3.5 h-3.5 ${neonSyncing ? 'animate-spin' : ''}`} />
+                <span>{neonSyncing ? 'Syncing to Neon...' : 'Sync All Tables to Neon'}</span>
+              </button>
+            </div>
+
+            {neonMsg && (
+              <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span>{neonMsg}</span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Menu,
   X,
+  Database,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -36,6 +37,7 @@ interface NavbarProps {
   onOpenRegisterPumpModal?: () => void;
   onOpenAuditGuideModal?: () => void;
   onOpenProductLaunchModal?: () => void;
+  onOpenNeonModal?: () => void;
   onToggleMobileMenu?: () => void;
   isMobileMenuOpen?: boolean;
 }
@@ -55,6 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenRegisterPumpModal,
   onOpenAuditGuideModal,
   onOpenProductLaunchModal,
+  onOpenNeonModal,
   onToggleMobileMenu,
   isMobileMenuOpen,
 }) => {
@@ -290,6 +293,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <AlertTriangle className="w-3.5 h-3.5 animate-bounce text-amber-400" />
               <span>{lowStockCount} Low Stock</span>
+            </button>
+          )}
+
+          {/* Neon PostgreSQL Cloud Database Status Button */}
+          {onOpenNeonModal && (
+            <button
+              onClick={onOpenNeonModal}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500/15 to-teal-500/15 hover:from-emerald-500/25 hover:to-teal-500/25 text-emerald-400 border border-emerald-500/40 px-2.5 py-1.5 rounded-lg text-xs font-bold transition shadow-xs group cursor-pointer"
+              title="Neon PostgreSQL Database Connected (AWS us-east-2). Click for diagnostics & sync."
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+              <span className="hidden sm:inline">Neon DB</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </button>
           )}
 

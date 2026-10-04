@@ -14,6 +14,7 @@ import { SubscriptionModal } from './components/SubscriptionModal';
 import { PumpRegistrationModal } from './components/PumpRegistrationModal';
 import { NewProductLaunchModal } from './components/NewProductLaunchModal';
 import { AccountsAuditGuideModal } from './components/AccountsAuditGuideModal';
+import { NeonDatabaseModal } from './components/NeonDatabaseModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { storage } from './services/storage';
 import {
@@ -58,6 +59,7 @@ export default function App() {
   const [showPumpRegistrationModal, setShowPumpRegistrationModal] = useState<boolean>(false);
   const [showProductLaunchModal, setShowProductLaunchModal] = useState<boolean>(false);
   const [showAuditGuideModal, setShowAuditGuideModal] = useState<boolean>(false);
+  const [showNeonModal, setShowNeonModal] = useState<boolean>(false);
   const [receiptSlip, setReceiptSlip] = useState<CreditIndentSlip | null>(null);
   const [receiptReading, setReceiptReading] = useState<{
     reading: NozzleReading;
@@ -117,6 +119,7 @@ export default function App() {
         onOpenRegisterPumpModal={() => setShowPumpRegistrationModal(true)}
         onOpenAuditGuideModal={() => setShowAuditGuideModal(true)}
         onOpenProductLaunchModal={() => setShowProductLaunchModal(true)}
+        onOpenNeonModal={() => setShowNeonModal(true)}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMobileMenuOpen={isMobileMenuOpen}
       />
@@ -316,6 +319,11 @@ export default function App() {
           setShowAuditGuideModal(false);
         }}
       />
+
+      {/* Neon PostgreSQL Cloud Database Modal */}
+      {showNeonModal && (
+        <NeonDatabaseModal onClose={() => setShowNeonModal(false)} />
+      )}
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}
       <MobileBottomNav
