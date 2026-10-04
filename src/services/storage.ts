@@ -15,6 +15,8 @@ import {
   PumpSubscription,
   RegisteredPump,
   SubscriptionInvoice,
+  TankerReceipt,
+  DailyFuelStockReconciliation,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -33,6 +35,8 @@ const STORAGE_KEYS = {
   RECONCILIATIONS: 'pumppro_reconciliations',
   SUBSCRIPTION: 'pumppro_subscription',
   REGISTERED_PUMPS: 'pumppro_registered_pumps',
+  TANKER_RECEIPTS: 'pumppro_tanker_receipts',
+  STOCK_RECONCILIATIONS: 'pumppro_stock_reconciliations',
 };
 
 // Initial default settings
@@ -689,6 +693,112 @@ export const DEFAULT_REGISTERED_PUMPS: RegisteredPump[] = [
   },
 ];
 
+// Default Tanker Delivery Receipts (TT Decantations)
+export const DEFAULT_TANKER_RECEIPTS: TankerReceipt[] = [
+  {
+    id: 'tr-01',
+    date: getTodayDateString(),
+    time: '08:30 AM',
+    tankerNo: 'AS-01-EC-9921',
+    invoiceNo: 'IOCL-INV-2026-98101',
+    supplier: 'Indian Oil (Betkuchi Terminal)',
+    fuelType: 'diesel',
+    tankId: 'tank-2',
+    invoiceQuantityLiters: 12000,
+    actualReceivedLiters: 11985,
+    shortageGainLiters: -15, // 15 L decantation shortage
+    densityObserved: 826.4,
+    temperature: 28.5,
+    dipBeforeCm: 112,
+    dipAfterCm: 182,
+    driverName: 'Manas Das',
+    driverPhone: '+91 94350 22119',
+    decantedBy: 'Rajesh (DSM)',
+    remarks: 'Seal intact, density tested with hydrometer & thermometer',
+    timestamp: Date.now() - 3600000 * 5,
+  },
+  {
+    id: 'tr-02',
+    date: getTodayDateString(),
+    time: '09:15 AM',
+    tankerNo: 'AS-01-EC-9921',
+    invoiceNo: 'IOCL-INV-2026-98102',
+    supplier: 'Indian Oil (Betkuchi Terminal)',
+    fuelType: 'petrol',
+    tankId: 'tank-1',
+    invoiceQuantityLiters: 8000,
+    actualReceivedLiters: 7990,
+    shortageGainLiters: -10, // 10 L transit loss
+    densityObserved: 738.2,
+    temperature: 28.0,
+    dipBeforeCm: 96,
+    dipAfterCm: 144,
+    driverName: 'Manas Das',
+    driverPhone: '+91 94350 22119',
+    decantedBy: 'Rajesh (DSM)',
+    remarks: 'Discharge via vapor recovery nozzle, dip verified',
+    timestamp: Date.now() - 3600000 * 4.5,
+  },
+];
+
+// Default Daily Fuel Stock Reconciliations
+export const DEFAULT_STOCK_RECONCILIATIONS: DailyFuelStockReconciliation[] = [
+  {
+    id: 'recon-tank-1',
+    date: getTodayDateString(),
+    tankId: 'tank-1',
+    tankName: 'Underground Tank 1 - Petrol (MS)',
+    fuelType: 'petrol',
+    openingStockLiters: 11050,
+    stockReceivedLiters: 7990,
+    totalAvailableLiters: 19040, // 11050 + 7990
+    meteredSalesLiters: 1629.5, // Total sales from Petrol nozzles
+    testingQuantityLiters: 10,
+    netSalesLiters: 1619.5,
+    expectedClosingLiters: 17420.5, // 19040 - 1619.5
+    actualClosingLiters: 17420, // Measured physical dip
+    actualDipReadingCm: 144,
+    varianceLiters: -0.5, // 0.5L variance, well within 0.2% tolerance
+    status: 'Normal',
+    shortageLiters: 0.5,
+    gainLiters: 0,
+    tolerancePercentage: 0.25,
+    toleranceLiters: 43.5,
+    withinTolerance: true,
+    financialImpact: -52.1,
+    recordedBy: 'Bhaskar Senapati (Manager)',
+    remarks: 'Morning decantation verified. Physical dip matches expected closing within 0.5L.',
+    timestamp: Date.now() - 3600000 * 2,
+  },
+  {
+    id: 'recon-tank-2',
+    date: getTodayDateString(),
+    tankId: 'tank-2',
+    tankName: 'Underground Tank 2 - Diesel (HSD)',
+    fuelType: 'diesel',
+    openingStockLiters: 16095,
+    stockReceivedLiters: 11985,
+    totalAvailableLiters: 28080, // 16095 + 11985
+    meteredSalesLiters: 3280,
+    testingQuantityLiters: 10,
+    netSalesLiters: 3270,
+    expectedClosingLiters: 24810, // 28080 - 3270
+    actualClosingLiters: 24800, // Measured dip
+    actualDipReadingCm: 182,
+    varianceLiters: -10, // 10L shortage
+    status: 'Shortage',
+    shortageLiters: 10,
+    gainLiters: 0,
+    tolerancePercentage: 0.2,
+    toleranceLiters: 49.6,
+    withinTolerance: true, // within permissible handling loss
+    financialImpact: -928.0,
+    recordedBy: 'Bhaskar Senapati (Manager)',
+    remarks: '10 Liters minor handling shortage recorded. Within standard oil company tolerance.',
+    timestamp: Date.now() - 3600000 * 2,
+  },
+];
+
 export interface NeonDbStatus {
   connected: boolean;
   status: string;
@@ -846,6 +956,8 @@ class StorageService {
         [STORAGE_KEYS.RECONCILIATIONS]: this.getReconciliations(),
         [STORAGE_KEYS.SUBSCRIPTION]: this.getSubscription(),
         [STORAGE_KEYS.REGISTERED_PUMPS]: this.getRegisteredPumps(),
+        [STORAGE_KEYS.TANKER_RECEIPTS]: this.getTankerReceipts(),
+        [STORAGE_KEYS.STOCK_RECONCILIATIONS]: this.getStockReconciliations(),
       };
 
       const res = await fetch('/api/db/bulk-save', {
@@ -1361,6 +1473,201 @@ class StorageService {
     this.saveSubscription(sub);
   }
 
+  // Tanker Delivery Receipts (TT Decantations)
+  getTankerReceipts(): TankerReceipt[] {
+    return this.getItem<TankerReceipt[]>(STORAGE_KEYS.TANKER_RECEIPTS, DEFAULT_TANKER_RECEIPTS);
+  }
+
+  saveTankerReceipts(receipts: TankerReceipt[]): void {
+    this.setItem(STORAGE_KEYS.TANKER_RECEIPTS, receipts);
+  }
+
+  addTankerReceipt(receiptData: Omit<TankerReceipt, 'id' | 'timestamp'>): TankerReceipt {
+    const receipts = this.getTankerReceipts();
+    const newReceipt: TankerReceipt = {
+      ...receiptData,
+      id: `tr-${Date.now()}`,
+      timestamp: Date.now(),
+    };
+    receipts.unshift(newReceipt);
+    this.saveTankerReceipts(receipts);
+
+    // Automatically update the target underground tank's volume and lastRefillDate
+    const tanks = this.getTanks();
+    const targetTank = tanks.find(t => t.id === newReceipt.tankId);
+    if (targetTank) {
+      const updatedVolume = Math.min(
+        targetTank.capacityLiters,
+        targetTank.currentVolumeLiters + newReceipt.actualReceivedLiters
+      );
+      this.updateTankDip(
+        targetTank.id,
+        newReceipt.dipAfterCm || targetTank.dipReadingCm,
+        updatedVolume
+      );
+    }
+
+    return newReceipt;
+  }
+
+  deleteTankerReceipt(id: string): void {
+    const receipts = this.getTankerReceipts();
+    this.saveTankerReceipts(receipts.filter(r => r.id !== id));
+  }
+
+  // Daily Fuel Stock Reconciliations
+  getStockReconciliations(): DailyFuelStockReconciliation[] {
+    return this.getItem<DailyFuelStockReconciliation[]>(
+      STORAGE_KEYS.STOCK_RECONCILIATIONS,
+      DEFAULT_STOCK_RECONCILIATIONS
+    );
+  }
+
+  saveStockReconciliations(reconciliations: DailyFuelStockReconciliation[]): void {
+    this.setItem(STORAGE_KEYS.STOCK_RECONCILIATIONS, reconciliations);
+  }
+
+  addStockReconciliation(recordData: Omit<DailyFuelStockReconciliation, 'id' | 'timestamp'>): DailyFuelStockReconciliation {
+    const list = this.getStockReconciliations();
+    const existingIndex = list.findIndex(r => r.tankId === recordData.tankId && r.date === recordData.date);
+    const newRecord: DailyFuelStockReconciliation = {
+      ...recordData,
+      id: existingIndex >= 0 ? list[existingIndex].id : `recon-${Date.now()}`,
+      timestamp: Date.now(),
+    };
+
+    if (existingIndex >= 0) {
+      list[existingIndex] = newRecord;
+    } else {
+      list.unshift(newRecord);
+    }
+    this.saveStockReconciliations(list);
+
+    // Sync physical dip to tank stock
+    if (newRecord.actualClosingLiters > 0) {
+      this.updateTankDip(newRecord.tankId, newRecord.actualDipReadingCm, newRecord.actualClosingLiters);
+    }
+
+    return newRecord;
+  }
+
+  deleteStockReconciliation(id: string): void {
+    const list = this.getStockReconciliations();
+    this.saveStockReconciliations(list.filter(r => r.id !== id));
+  }
+
+  // Calculation logic for Tank Stock Reconciliation on a given date
+  calculateStockReconciliation(
+    tankId: string,
+    date: string,
+    customOpeningStock?: number,
+    actualClosingLiters?: number,
+    actualDipCm?: number
+  ): DailyFuelStockReconciliation {
+    const tanks = this.getTanks();
+    const tank = tanks.find(t => t.id === tankId) || tanks[0];
+    const rates = this.getRates();
+    const rateObj = rates.find(r => r.type === tank.fuelType) || rates[0];
+    const fuelRate = rateObj?.ratePerLiter || 95;
+
+    // 1. Opening Stock (day start stock in liters)
+    let openingStock = 0;
+    if (customOpeningStock !== undefined && customOpeningStock >= 0) {
+      openingStock = customOpeningStock;
+    } else {
+      const allRecons = this.getStockReconciliations();
+      const prevRecon = allRecons.find(r => r.tankId === tank.id && r.date < date);
+      if (prevRecon) {
+        openingStock = prevRecon.actualClosingLiters;
+      } else {
+        openingStock = Math.round(tank.capacityLiters * 0.45);
+      }
+    }
+
+    // 2. Stock Received (oil/fuel received via tanker delivery on that day)
+    const tankerReceipts = this.getTankerReceipts().filter(
+      tr => tr.tankId === tank.id && tr.date === date
+    );
+    const stockReceived = tankerReceipts.reduce((sum, tr) => sum + tr.actualReceivedLiters, 0);
+
+    // 3. Total Available Stock (Opening Stock + Stock Received)
+    const totalAvailable = openingStock + stockReceived;
+
+    // 4. Sales (total metered sales for the day from connected nozzles)
+    const nozzles = this.getNozzles().filter(n => n.tankId === tank.id);
+    const nozzleIds = new Set(nozzles.map(n => n.id));
+    const readings = this.getReadings().filter(
+      r => r.date === date && nozzleIds.has(r.nozzleId)
+    );
+    const meteredSales = readings.reduce((sum, r) => sum + (r.netSaleQty + r.testingQty), 0);
+    const testingQty = readings.reduce((sum, r) => sum + r.testingQty, 0);
+    const netSales = meteredSales - testingQty;
+
+    // 5. Expected Closing Stock (Opening + Received - Sales)
+    const expectedClosing = Math.max(0, totalAvailable - netSales);
+
+    // 6. Actual Closing Stock (actual physical dip/stock measured at day end)
+    const physicalClosing =
+      actualClosingLiters !== undefined && actualClosingLiters >= 0
+        ? actualClosingLiters
+        : tank.currentVolumeLiters;
+    const dipCm = actualDipCm !== undefined ? actualDipCm : tank.dipReadingCm;
+
+    // 7. Shortage / Gain Calculation:
+    // Variance = Actual Closing Stock - Expected Closing Stock
+    const variance = Number((physicalClosing - expectedClosing).toFixed(2));
+    const tolerancePct = 0.25;
+    const toleranceLiters = Number(((totalAvailable * tolerancePct) / 100).toFixed(2));
+    const isWithinTolerance = Math.abs(variance) <= toleranceLiters;
+
+    let status: 'Normal' | 'Shortage' | 'Gain' = 'Normal';
+    let shortageLiters = 0;
+    let gainLiters = 0;
+
+    if (variance < 0) {
+      status = 'Shortage';
+      shortageLiters = Math.abs(variance);
+    } else if (variance > 0) {
+      status = 'Gain';
+      gainLiters = variance;
+    }
+
+    const financialImpact = Number((variance * fuelRate).toFixed(2));
+
+    return {
+      id: `calc-${tank.id}-${date}`,
+      date,
+      tankId: tank.id,
+      tankName: tank.name,
+      fuelType: tank.fuelType,
+      openingStockLiters: Number(openingStock.toFixed(2)),
+      stockReceivedLiters: Number(stockReceived.toFixed(2)),
+      totalAvailableLiters: Number(totalAvailable.toFixed(2)),
+      meteredSalesLiters: Number(meteredSales.toFixed(2)),
+      testingQuantityLiters: Number(testingQty.toFixed(2)),
+      netSalesLiters: Number(netSales.toFixed(2)),
+      expectedClosingLiters: Number(expectedClosing.toFixed(2)),
+      actualClosingLiters: Number(physicalClosing.toFixed(2)),
+      actualDipReadingCm: Number(dipCm.toFixed(1)),
+      varianceLiters: variance,
+      status,
+      shortageLiters,
+      gainLiters,
+      tolerancePercentage: tolerancePct,
+      toleranceLiters,
+      withinTolerance: isWithinTolerance,
+      financialImpact,
+      recordedBy: 'Station DSM / Incharge',
+      remarks:
+        status === 'Shortage'
+          ? `Shortage of ${shortageLiters} Liters detected (${financialImpact < 0 ? `₹${Math.abs(financialImpact).toLocaleString('en-IN')}` : ''}). ${isWithinTolerance ? 'Within permissible handling limit.' : 'Exceeds standard handling tolerance!'}`
+          : status === 'Gain'
+          ? `Gain of ${gainLiters} Liters recorded (temperature expansion or calibrator offset).`
+          : 'Zero variance verified. Physical dip matches expected closing perfectly.',
+      timestamp: Date.now(),
+    };
+  }
+
   // Export full JSON backup
   exportBackupJSON(): string {
     const backup = {
@@ -1377,6 +1684,8 @@ class StorageService {
       creditPayments: this.getCreditPayments(),
       expenses: this.getExpenses(),
       reconciliations: this.getReconciliations(),
+      tankerReceipts: this.getTankerReceipts(),
+      stockReconciliations: this.getStockReconciliations(),
       exportedAt: new Date().toISOString(),
       app: 'PumpPro v2.4',
     };
@@ -1399,6 +1708,8 @@ class StorageService {
       if (data.creditPayments) this.setItem(STORAGE_KEYS.CREDIT_PAYMENTS, data.creditPayments);
       if (data.expenses) this.saveExpenses(data.expenses);
       if (data.reconciliations) this.setItem(STORAGE_KEYS.RECONCILIATIONS, data.reconciliations);
+      if (data.tankerReceipts) this.saveTankerReceipts(data.tankerReceipts);
+      if (data.stockReconciliations) this.saveStockReconciliations(data.stockReconciliations);
       window.dispatchEvent(new Event('pumppro_data_changed'));
       return true;
     } catch (e) {

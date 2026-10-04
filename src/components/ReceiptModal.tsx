@@ -53,7 +53,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           {/* Header */}
           <div className="text-center space-y-1 border-b border-dashed border-slate-300 pb-3">
             <div className="flex justify-center mb-1">
-              <PumpProLogo size="sm" variant="icon" theme="print" />
+              <PumpProLogo size="sm" theme="light" />
             </div>
             <div className="font-extrabold text-sm uppercase tracking-tight">
               {settings.pumpName}

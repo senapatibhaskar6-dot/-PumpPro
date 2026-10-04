@@ -6,6 +6,7 @@ import {
   Users,
   Scale,
   Menu,
+  Truck,
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -15,6 +16,8 @@ interface MobileBottomNavProps {
   lowStockCount: number;
   onToggleMenu: () => void;
   isMenuOpen: boolean;
+  activeRole?: 'staff' | 'owner';
+  onToggleRole?: (role: 'staff' | 'owner') => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -24,12 +27,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   lowStockCount,
   onToggleMenu,
   isMenuOpen,
+  activeRole = 'staff',
+  onToggleRole,
 }) => {
   const tabs = [
     {
       id: 'dashboard',
-      label: 'Home',
-      labelAssamese: 'ডেচব’ৰ্ড',
+      label: activeRole === 'staff' ? 'Staff Entry' : 'Home',
+      labelAssamese: activeRole === 'staff' ? 'ষ্টাফ এণ্ট্ৰী' : 'ডেচব’ৰ্ড',
       icon: LayoutDashboard,
       badge: null,
     },
@@ -39,6 +44,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       labelAssamese: 'মিটাৰ',
       icon: Fuel,
       badge: null,
+    },
+    {
+      id: 'fuel-stock',
+      label: 'Stock',
+      labelAssamese: 'মজুত',
+      icon: Truck,
+      badge: 'Loss Audit',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     },
     {
       id: 'lubricants',

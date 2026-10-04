@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   HelpCircle,
   Calculator,
+  Truck,
 } from 'lucide-react';
 import {
   FuelRate,
@@ -36,7 +37,7 @@ import {
   ExpenseRecord,
   PumpSettings,
 } from '../types';
-import { storage } from '../services/storage';
+import { storage, getTodayDateString } from '../services/storage';
 import { NewProductLaunchModal } from './NewProductLaunchModal';
 import { AccountsAuditGuideModal } from './AccountsAuditGuideModal';
 
@@ -189,6 +190,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       fuelProductStats,
     };
   }, [readings, lubeSales, expenses, creditSlips, customers, nozzles, rates, lubricants]);
+
+  const todayStr = getTodayDateString();
+  const allRecons = storage.getStockReconciliations();
+  const todayStockRecons = useMemo(() => {
+    return tanks.map((tank) => {
+      const saved = allRecons.find((r) => r.tankId === tank.id && r.date === todayStr);
+      return saved || storage.calculateStockReconciliation(tank.id, todayStr);
+    });
+  }, [tanks, allRecons, todayStr, readings]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -377,6 +387,121 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <HelpCircle className="w-4 h-4" />
             <span>হিচাপ ক'ত কিদৰে চাব? (Guide & Audit)</span>
           </button>
+        </div>
+
+        {/* Daily Fuel Stock Reconciliation & Shortage/Gain Audit (Core User Requirement) */}
+        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-orange-500/15 text-orange-400 border border-orange-500/30">
+                <Scale className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <span>Fuel Stock Management & Shortage Tracking</span>
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-orange-500/30">
+                    Daily Reconciliation
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Formula: Expected Closing (Opening + Received − Sales) vs Actual Physical Dip
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate('fuel-stock')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-xl text-xs font-bold transition self-start sm:self-auto cursor-pointer"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>Open Stock & Tankers Ledger →</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {tanks.map((tank) => {
+              const recon =
+                todayStockRecons.find((r) => r.tankId === tank.id) ||
+                storage.calculateStockReconciliation(tank.id, todayStr);
+              const isShortage = recon.status === 'Shortage';
+              const isGain = recon.status === 'Gain';
+
+              return (
+                <div
+                  key={tank.id}
+                  className={`p-3.5 rounded-xl border flex flex-col justify-between transition ${
+                    isShortage
+                      ? 'bg-red-500/10 border-red-500/30 text-red-200'
+                      : isGain
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                      : 'bg-slate-900 border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                        <Droplet className="w-3.5 h-3.5 text-orange-400" />
+                        {tank.name}
+                      </span>
+                      <span
+                        className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                          isShortage
+                            ? 'bg-red-500 text-white'
+                            : isGain
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'bg-slate-800 text-slate-300'
+                        }`}
+                      >
+                        {isShortage ? 'Shortage' : isGain ? 'Gain' : 'Balanced'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-2">
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                        <span className="text-[10px] text-slate-400 block font-sans">1. Opening:</span>
+                        <span className="font-bold text-white">{recon.openingStockLiters.toLocaleString()} L</span>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                        <span className="text-[10px] text-sky-400 block font-sans">2. Received:</span>
+                        <span className="font-bold text-sky-400">+{recon.stockReceivedLiters.toLocaleString()} L</span>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                        <span className="text-[10px] text-red-400 block font-sans">3. Sales:</span>
+                        <span className="font-bold text-red-400">-{recon.netSalesLiters.toLocaleString()} L</span>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800/80">
+                        <span className="text-[10px] text-purple-400 block font-sans">4. Expected:</span>
+                        <span className="font-bold text-purple-300">{recon.expectedClosingLiters.toLocaleString()} L</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Actual Physical Dip:</span>
+                        <span className="font-bold text-white font-mono text-sm">
+                          {recon.actualClosingLiters.toLocaleString()} L
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">Variance / Loss:</span>
+                        <span
+                          className={`font-black font-mono text-sm ${
+                            isShortage ? 'text-red-400' : isGain ? 'text-emerald-400' : 'text-slate-300'
+                          }`}
+                        >
+                          {isShortage
+                            ? `-${recon.shortageLiters.toFixed(1)} L (${sym}${Math.abs(recon.financialImpact).toFixed(0)})`
+                            : isGain
+                            ? `+${recon.gainLiters.toFixed(1)} L (+${sym}${Math.abs(recon.financialImpact).toFixed(0)})`
+                            : '0.0 L (Balanced)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* 2-Column Telemetry Grid: Left Fuel Sales by Product & Nozzles | Right Underground Tank Dips */}
@@ -609,6 +734,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
               <span className="text-slate-400 font-mono">Dip verified</span>
             </div>
+
+            {/* Fuel Stock & Shortage Reconciliation Hub Button */}
+            <button
+              onClick={() => onNavigate('fuel-stock')}
+              className="w-full py-2.5 px-3.5 bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-orange-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/40 rounded-xl text-xs font-bold text-orange-400 hover:text-white flex items-center justify-between transition group shadow-md cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-orange-400 group-hover:scale-110 transition-transform" />
+                <span className="text-left leading-tight">
+                  <span className="block font-bold">Fuel Stock & Tanker Inflow</span>
+                  <span className="text-[10px] text-slate-400 block font-normal">Opening + Tankers - Sales = Shortage/Gain</span>
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-bold text-emerald-400 group-hover:translate-x-0.5 transition-transform">
+                Reconcile →
+              </span>
+            </button>
           </div>
         </div>
       </div>

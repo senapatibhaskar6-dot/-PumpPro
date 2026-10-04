@@ -3,6 +3,7 @@ import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { MeterReadings } from './components/MeterReadings';
+import { FuelStockManager } from './components/FuelStockManager';
 import { LubricantsManager } from './components/LubricantsManager';
 import { CreditLedger } from './components/CreditLedger';
 import { CashReconciliation } from './components/CashReconciliation';
@@ -16,6 +17,7 @@ import { NewProductLaunchModal } from './components/NewProductLaunchModal';
 import { AccountsAuditGuideModal } from './components/AccountsAuditGuideModal';
 import { NeonDatabaseModal } from './components/NeonDatabaseModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { StaffPanel } from './components/StaffPanel';
 import { storage } from './services/storage';
 import {
   PumpSettings,
@@ -38,6 +40,17 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [activeShift, setActiveShift] = useState<string>('Shift 1 (Morning)');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [activeRole, setActiveRole] = useState<'staff' | 'owner'>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('pumppro_active_role') : null;
+    return saved === 'owner' || saved === 'staff' ? saved : 'staff';
+  });
+
+  const handleRoleChange = (role: 'staff' | 'owner') => {
+    setActiveRole(role);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pumppro_active_role', role);
+    }
+  };
 
   // App Data States
   const [settings, setSettings] = useState<PumpSettings>(storage.getSettings());
@@ -122,6 +135,8 @@ export default function App() {
         onOpenNeonModal={() => setShowNeonModal(true)}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMobileMenuOpen={isMobileMenuOpen}
+        activeRole={activeRole}
+        onToggleRole={handleRoleChange}
       />
 
       {/* Main Workspace Layout */}
@@ -134,27 +149,49 @@ export default function App() {
           lowStockCount={lowStockCount}
           isMobileOpen={isMobileMenuOpen}
           onCloseMobile={() => setIsMobileMenuOpen(false)}
+          activeRole={activeRole}
+          onToggleRole={handleRoleChange}
         />
 
         {/* Content Body Area */}
         <main className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6 pb-28 lg:pb-8">
           <div className="max-w-7xl mx-auto">
             {currentTab === 'dashboard' && (
-              <Dashboard
-                settings={settings}
-                rates={rates}
-                tanks={tanks}
-                nozzles={nozzles}
-                readings={readings}
-                lubricants={lubricants}
-                lubeSales={lubeSales}
-                customers={customers}
-                creditSlips={creditSlips}
-                expenses={expenses}
-                activeShift={activeShift}
-                onNavigate={setCurrentTab}
-                onRefreshData={refreshData}
-              />
+              activeRole === 'staff' ? (
+                <StaffPanel
+                  settings={settings}
+                  rates={rates}
+                  tanks={tanks}
+                  nozzles={nozzles}
+                  readings={readings}
+                  lubricants={lubricants}
+                  lubeSales={lubeSales}
+                  customers={customers}
+                  creditSlips={creditSlips}
+                  expenses={expenses}
+                  activeShift={activeShift}
+                  onRefreshData={refreshData}
+                  onSwitchToOwner={() => handleRoleChange('owner')}
+                  onNavigate={setCurrentTab}
+                  onPrintReadingSlip={(r, n) => setReceiptReading({ reading: r, nozzle: n })}
+                />
+              ) : (
+                <Dashboard
+                  settings={settings}
+                  rates={rates}
+                  tanks={tanks}
+                  nozzles={nozzles}
+                  readings={readings}
+                  lubricants={lubricants}
+                  lubeSales={lubeSales}
+                  customers={customers}
+                  creditSlips={creditSlips}
+                  expenses={expenses}
+                  activeShift={activeShift}
+                  onNavigate={setCurrentTab}
+                  onRefreshData={refreshData}
+                />
+              )
             )}
 
             {currentTab === 'readings' && (
@@ -166,6 +203,17 @@ export default function App() {
                 activeShift={activeShift}
                 onRefreshData={refreshData}
                 onPrintSlip={(r, n) => setReceiptReading({ reading: r, nozzle: n })}
+              />
+            )}
+
+            {currentTab === 'fuel-stock' && (
+              <FuelStockManager
+                settings={settings}
+                tanks={tanks}
+                rates={rates}
+                nozzles={nozzles}
+                readings={readings}
+                onRefreshData={refreshData}
               />
             )}
 
@@ -336,6 +384,8 @@ export default function App() {
         lowStockCount={lowStockCount}
         onToggleMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         isMenuOpen={isMobileMenuOpen}
+        activeRole={activeRole}
+        onToggleRole={handleRoleChange}
       />
     </div>
   );

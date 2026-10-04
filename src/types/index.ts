@@ -283,3 +283,54 @@ export interface RegisteredPump {
   isActive: boolean;
 }
 
+export interface TankerReceipt {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  tankerNo: string; // e.g. "AS-01-EC-9921"
+  invoiceNo: string; // e.g. "IOCL-INV-883921"
+  supplier: string; // "Indian Oil", "BPCL", "HPCL", etc.
+  fuelType: FuelType;
+  tankId: string; // Target Underground Tank
+  invoiceQuantityLiters: number; // Invoiced quantity
+  actualReceivedLiters: number; // Received quantity after decantation
+  shortageGainLiters: number; // actualReceivedLiters - invoiceQuantityLiters
+  densityObserved: number; // Density in kg/m³ @ 15°C
+  temperature: number; // Temperature in °C
+  dipBeforeCm: number;
+  dipAfterCm: number;
+  driverName?: string;
+  driverPhone?: string;
+  decantedBy?: string; // DSM or Manager name
+  remarks?: string;
+  timestamp: number;
+}
+
+export interface DailyFuelStockReconciliation {
+  id: string;
+  date: string; // YYYY-MM-DD
+  tankId: string;
+  tankName: string;
+  fuelType: FuelType;
+  openingStockLiters: number; // Day start physical stock (A)
+  stockReceivedLiters: number; // Tanker delivery receipts on that day (B)
+  totalAvailableLiters: number; // (C = A + B)
+  meteredSalesLiters: number; // Total dispenser sales (D)
+  testingQuantityLiters: number; // Calibration test pour returned to tank
+  netSalesLiters: number; // meteredSales - testingQuantity
+  expectedClosingLiters: number; // (E = C - netSales)
+  actualClosingLiters: number; // Measured physical dip closing stock (F)
+  actualDipReadingCm: number; // Physical dip stick reading in cm
+  varianceLiters: number; // (G = F - E) Negative = Shortage, Positive = Gain
+  status: 'Normal' | 'Shortage' | 'Gain';
+  shortageLiters: number; // e.g. 50 liters short
+  gainLiters: number; // e.g. 20 liters gain
+  tolerancePercentage: number; // Standard oil company tolerance e.g. 0.2% - 0.5%
+  toleranceLiters: number;
+  withinTolerance: boolean;
+  financialImpact: number; // varianceLiters * rate
+  recordedBy: string;
+  remarks?: string;
+  timestamp: number;
+}
+

@@ -40,6 +40,8 @@ interface NavbarProps {
   onOpenNeonModal?: () => void;
   onToggleMobileMenu?: () => void;
   isMobileMenuOpen?: boolean;
+  activeRole?: 'staff' | 'owner';
+  onToggleRole?: (role: 'staff' | 'owner') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -60,6 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNeonModal,
   onToggleMobileMenu,
   isMobileMenuOpen,
+  activeRole = 'staff',
+  onToggleRole,
 }) => {
   const [time, setTime] = useState<string>('');
   const [dateStr, setDateStr] = useState<string>('');
@@ -180,16 +184,46 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          <div className="sm:hidden">
-            <PumpProLogo size="sm" variant="compact" />
+          <div className="sm:hidden flex items-center">
+            <PumpProLogo size="sm" />
           </div>
-          <div className="hidden sm:block">
-            <PumpProLogo size="md" variant="full" />
+          <div className="hidden sm:flex items-center">
+            <PumpProLogo size="md" />
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2.5">
+          {/* Dual Panel Role Switcher (Staff vs Owner) */}
+          {onToggleRole && (
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner">
+              <button
+                onClick={() => onToggleRole('staff')}
+                className={`px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                  activeRole === 'staff'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Staff Panel: Quick Meter Readings, Lube Sales, Tankers & Stock Reconciliations"
+              >
+                <span>⚡</span>
+                <span className="hidden sm:inline">Staff</span>
+              </button>
+              <button
+                onClick={() => onToggleRole('owner')}
+                className={`px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                  activeRole === 'owner'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Owner Panel: Full Executive Dashboard, Shortage Audits & Financial Reports"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Owner</span>
+              </button>
+            </div>
+          )}
+
           {/* Active Station Switcher */}
           {registeredPumps.length > 0 && (
             <div className="relative">

@@ -13,6 +13,7 @@ import {
   Database,
   ArrowUpRight,
   X,
+  Truck,
 } from 'lucide-react';
 import { PumpProLogo } from './PumpProLogo';
 
@@ -23,6 +24,8 @@ interface SidebarProps {
   lowStockCount: number;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  activeRole?: 'staff' | 'owner';
+  onToggleRole?: (role: 'staff' | 'owner') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,6 +35,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lowStockCount,
   isMobileOpen = false,
   onCloseMobile,
+  activeRole = 'staff',
+  onToggleRole,
 }) => {
   const navItems = [
     {
@@ -46,6 +51,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Fuel,
       sublabel: 'Daily Fuel Sales',
       badge: null,
+    },
+    {
+      id: 'fuel-stock',
+      label: 'Fuel Stock & Tankers',
+      icon: Truck,
+      sublabel: 'Opening, Inflow & Shortage',
+      badge: 'Shortage Audit',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     },
     {
       id: 'lubricants',
@@ -126,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-3.5 flex-1 overflow-y-auto">
           {/* Mobile Drawer Top Bar with Brand & Close Button */}
           <div className="lg:hidden flex items-center justify-between pb-3 mb-2 border-b border-slate-800">
-            <PumpProLogo size="sm" variant="compact" />
+            <PumpProLogo size="sm" />
             <button
               onClick={onCloseMobile}
               className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
@@ -135,6 +148,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Dual Panel Switcher in Sidebar */}
+          {onToggleRole && (
+            <div className="mb-3 p-1.5 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="text-[10px] uppercase font-bold text-slate-400 px-2 py-0.5 mb-1 flex items-center justify-between">
+                <span>Access Mode</span>
+                <span className="font-mono text-orange-400">Role View</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  onClick={() => onToggleRole('staff')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeRole === 'staff'
+                      ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>Staff</span>
+                </button>
+                <button
+                  onClick={() => onToggleRole('owner')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeRole === 'owner'
+                      ? 'bg-sky-500 text-white shadow-md font-black'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <span>👔</span>
+                  <span>Owner</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Section Label */}
           <div className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
