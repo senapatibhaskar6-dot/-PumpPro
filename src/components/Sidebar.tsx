@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   X,
   Truck,
+  Lock,
 } from 'lucide-react';
 import { PumpProLogo } from './PumpProLogo';
 
@@ -26,6 +27,7 @@ interface SidebarProps {
   onCloseMobile?: () => void;
   activeRole?: 'staff' | 'owner';
   onToggleRole?: (role: 'staff' | 'owner') => void;
+  onLockOwner?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   activeRole = 'staff',
   onToggleRole,
+  onLockOwner,
 }) => {
   const navItems = [
     {
@@ -180,6 +183,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>Owner</span>
                 </button>
               </div>
+
+              {/* Quick Lock Button */}
+              {activeRole === 'owner' && onLockOwner && (
+                <button
+                  onClick={onLockOwner}
+                  className="mt-2 w-full py-1 px-2.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[11px] font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  title="Lock Hisab: Hide confidential accounts immediately"
+                >
+                  <Lock className="w-3 h-3 text-rose-400" />
+                  <span>হিচাপ লক কৰক (Lock Hisab)</span>
+                </button>
+              )}
             </div>
           )}
 

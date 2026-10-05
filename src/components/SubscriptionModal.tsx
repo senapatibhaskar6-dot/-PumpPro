@@ -373,6 +373,24 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>256-Bit SSL Encrypted • Multi-Pump Consolidated GST Tax Invoice • Instant Activation</span>
           </div>
+
+          {/* Test Auto-Lock Simulation Button */}
+          <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs mt-3">
+            <span className="text-slate-400">Lock Testing (পৰীক্ষা):</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('পাম্পপ্ৰ’ চাবস্ক্ৰিপচনৰ ম্যাদ শেষ কৰি অটো-লক পৰীক্ষা কৰিব বিচাৰে নেকি? (Simulate subscription expiry & auto-lock?)')) {
+                  storage.expireSubscriptionForTesting();
+                  onSubscriptionUpdated();
+                  onClose();
+                }
+              }}
+              className="text-xs text-red-400 hover:text-red-300 font-bold bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-xl transition cursor-pointer"
+            >
+              ⚠️ Simulate Expiry & Auto-Lock (অটো-লক পৰীক্ষা)
+            </button>
+          </div>
         </div>
       </div>
     </div>

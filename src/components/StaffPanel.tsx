@@ -10,6 +10,7 @@ import {
   Package,
   ArrowRight,
   ShieldCheck,
+  Lock,
   Check,
   X,
   TrendingDown,
@@ -353,26 +354,23 @@ export const StaffPanel: React.FC<StaffPanelProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-20">
-      {/* Top Banner: Mode Indicator & Touch Switcher */}
-      <div className="bg-gradient-to-r from-amber-500/15 via-slate-900 to-orange-500/15 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xl shadow-inner shrink-0">
+    <div className="space-y-3 sm:space-y-4 pb-20">
+      {/* Top Banner: Mode Indicator & Touch Switcher (Compact & Mobile-Optimized) */}
+      <div className="bg-gradient-to-r from-amber-500/15 via-slate-900 to-orange-500/15 border border-amber-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-lg flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-base sm:text-xl shadow-inner shrink-0">
             ⚡
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-extrabold tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">
-                Attendant / Staff Mode
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-[10px] sm:text-xs uppercase font-extrabold tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">
+                Staff Mode
               </span>
-              <span className="text-xs text-slate-400">{activeShift}</span>
+              <span className="text-[11px] sm:text-xs text-slate-400 truncate">{activeShift}</span>
             </div>
-            <h1 className="text-lg sm:text-xl font-black text-white mt-0.5">
-              Rapid Operations & Fuel Reconciliation
+            <h1 className="text-sm sm:text-lg font-black text-white truncate mt-0.5">
+              Daily Fuel & Meter Entry
             </h1>
-            <p className="text-xs text-slate-300">
-              Touch-friendly daily logging: Meter Readings, Tanker Decantations, and Dip Reconciliations.
-            </p>
           </div>
         </div>
 
@@ -380,74 +378,76 @@ export const StaffPanel: React.FC<StaffPanelProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onSwitchToOwner}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+            className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-md cursor-pointer"
+            title="Switch to Owner Dashboard (Requires Security PIN / পাছৱৰ্ড প্ৰয়োজন)"
           >
-            <ShieldCheck className="w-4 h-4 text-sky-400" />
-            <span>Switch to Owner Panel</span>
+            <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+            <span className="hidden sm:inline">Owner Dashboard (পাছৱৰ্ড সুৰক্ষিত)</span>
+            <span className="sm:hidden">Owner (PIN)</span>
           </button>
         </div>
       </div>
 
-      {/* Touch-Friendly Action Navigation Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+      {/* Touch-Friendly Action Navigation Bar (Horizontal Scroll on Mobile to Save Screen Space) */}
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-1">
         <button
           onClick={() => setActiveView('stock')}
-          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition text-center cursor-pointer ${
+          className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border flex items-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer text-xs font-bold ${
             activeView === 'stock'
-              ? 'bg-orange-500/20 border-orange-500 text-orange-400 font-bold shadow-lg shadow-orange-500/10'
+              ? 'bg-orange-500/20 border-orange-500 text-orange-400 shadow-md shadow-orange-500/10'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
           }`}
         >
-          <Scale className="w-5 h-5" />
-          <span className="text-xs">Fuel Reconciliation</span>
+          <Scale className="w-4 h-4" />
+          <span>Fuel Reconciliation</span>
         </button>
 
         <button
           onClick={() => setActiveView('meters')}
-          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition text-center cursor-pointer ${
+          className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border flex items-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer text-xs font-bold ${
             activeView === 'meters'
-              ? 'bg-orange-500/20 border-orange-500 text-orange-400 font-bold shadow-lg shadow-orange-500/10'
+              ? 'bg-orange-500/20 border-orange-500 text-orange-400 shadow-md shadow-orange-500/10'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
           }`}
         >
-          <Fuel className="w-5 h-5" />
-          <span className="text-xs">Meter Readings</span>
+          <Fuel className="w-4 h-4" />
+          <span>Meter Readings</span>
         </button>
 
         <button
           onClick={() => setActiveView('tanker')}
-          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition text-center cursor-pointer ${
+          className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border flex items-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer text-xs font-bold ${
             activeView === 'tanker'
-              ? 'bg-orange-500/20 border-orange-500 text-orange-400 font-bold shadow-lg shadow-orange-500/10'
+              ? 'bg-orange-500/20 border-orange-500 text-orange-400 shadow-md shadow-orange-500/10'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
           }`}
         >
-          <Truck className="w-5 h-5" />
-          <span className="text-xs">Tanker Decantation</span>
+          <Truck className="w-4 h-4" />
+          <span>Tanker Decantation</span>
         </button>
 
         <button
           onClick={() => setActiveView('lubes')}
-          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition text-center cursor-pointer ${
+          className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border flex items-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer text-xs font-bold ${
             activeView === 'lubes'
-              ? 'bg-orange-500/20 border-orange-500 text-orange-400 font-bold shadow-lg shadow-orange-500/10'
+              ? 'bg-orange-500/20 border-orange-500 text-orange-400 shadow-md shadow-orange-500/10'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
           }`}
         >
-          <Package className="w-5 h-5" />
-          <span className="text-xs">Quick Lube Sale</span>
+          <Package className="w-4 h-4" />
+          <span>Quick Lube Sale</span>
         </button>
 
         <button
           onClick={() => setActiveView('shift')}
-          className={`col-span-2 sm:col-span-1 p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition text-center cursor-pointer ${
+          className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border flex items-center gap-2 transition whitespace-nowrap shrink-0 cursor-pointer text-xs font-bold ${
             activeView === 'shift'
-              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold shadow-lg shadow-emerald-500/10'
+              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-md shadow-emerald-500/10'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
           }`}
         >
-          <DollarSign className="w-5 h-5 text-emerald-400" />
-          <span className="text-xs">Shift Cash Handover</span>
+          <DollarSign className="w-4 h-4 text-emerald-400" />
+          <span>Shift Handover</span>
         </button>
       </div>
 
@@ -504,151 +504,150 @@ export const StaffPanel: React.FC<StaffPanelProps> = ({
                 </div>
               </div>
 
-              {/* The 6 Core Fuel Stock Reconciliation Steps */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {/* The 6 Core Fuel Stock Reconciliation Steps (2-Column on Mobile so user sees all together) */}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
                 {/* 1. Opening Stock */}
-                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-orange-400 font-bold">1</span>
-                      Opening Stock
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 font-semibold mb-1">
+                    <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px] text-orange-400 font-bold shrink-0">1</span>
+                      <span className="truncate">Opening Stock</span>
                     </span>
-                    <span className="text-[10px] text-slate-500">Day Start</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 shrink-0">Start</span>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-xl sm:text-2xl font-black text-white font-mono">
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span className="text-lg sm:text-2xl font-black text-white font-mono truncate">
                       {reconData.openingStockLiters.toLocaleString()}
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">Liters</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-slate-900 flex items-center gap-1.5">
+                  <div className="mt-1.5 pt-1.5 border-t border-slate-900 flex items-center gap-1">
                     <input
                       type="number"
-                      placeholder="Edit opening (L)"
+                      placeholder="Edit (L)"
                       value={customOpening}
                       onChange={(e) => setCustomOpening(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-orange-500"
+                      className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] sm:text-[11px] text-white focus:outline-none focus:border-orange-500"
                     />
                   </div>
                 </div>
 
                 {/* 2. Stock Received via Tanker */}
-                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-sky-400 font-bold">2</span>
-                      Stock Received
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 font-semibold mb-1">
+                    <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px] text-sky-400 font-bold shrink-0">2</span>
+                      <span className="truncate">Stock Received</span>
                     </span>
-                    <span className="text-[10px] text-sky-400">Tanker TT</span>
+                    <span className="text-[9px] sm:text-[10px] text-sky-400 shrink-0">Tanker</span>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-xl sm:text-2xl font-black text-sky-400 font-mono">
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span className="text-lg sm:text-2xl font-black text-sky-400 font-mono truncate">
                       +{reconData.stockReceivedLiters.toLocaleString()}
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">Liters</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-900 truncate">
-                    {reconData.stockReceivedLiters > 0 ? 'Decanted today via tanker' : 'No tanker decanted today'}
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-900 truncate">
+                    {reconData.stockReceivedLiters > 0 ? 'Tanker decanted' : 'No tanker today'}
                   </p>
                 </div>
 
                 {/* 3. Total Available Stock (Opening + Received) */}
-                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between bg-gradient-to-br from-slate-950 to-slate-900">
-                  <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-amber-400 font-bold">3</span>
-                      Total Available Stock
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-gradient-to-br from-slate-950 to-slate-900">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 font-semibold mb-1">
+                    <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px] text-amber-400 font-bold shrink-0">3</span>
+                      <span className="truncate">Available Stock</span>
                     </span>
-                    <span className="text-[10px] text-slate-500">(1 + 2)</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 shrink-0">(1+2)</span>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono">
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span className="text-lg sm:text-2xl font-black text-amber-400 font-mono truncate">
                       {reconData.totalAvailableLiters.toLocaleString()}
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">Liters</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-900">
-                    Max capacity: {activeTank.capacityLiters.toLocaleString()} L
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-900 truncate">
+                    Cap: {activeTank.capacityLiters.toLocaleString()} L
                   </p>
                 </div>
 
                 {/* 4. Metered Sales */}
-                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-red-400 font-bold">4</span>
-                      Metered Sales
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 font-semibold mb-1">
+                    <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px] text-red-400 font-bold shrink-0">4</span>
+                      <span className="truncate">Metered Sales</span>
                     </span>
-                    <span className="text-[10px] text-slate-500">Nozzle Sales</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 shrink-0">Nozzles</span>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-xl sm:text-2xl font-black text-red-400 font-mono">
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span className="text-lg sm:text-2xl font-black text-red-400 font-mono truncate">
                       -{reconData.netSalesLiters.toLocaleString()}
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">Liters</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-900">
-                    Testing: {reconData.testingQuantityLiters} L • Gross: {reconData.meteredSalesLiters} L
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-900 truncate">
+                    Test: {reconData.testingQuantityLiters} L
                   </p>
                 </div>
 
                 {/* 5. Expected Closing Stock */}
-                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-purple-400 font-bold">5</span>
-                      Expected Closing Stock
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-slate-400 font-semibold mb-1">
+                    <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-slate-800 flex items-center justify-center text-[9px] sm:text-[10px] text-purple-400 font-bold shrink-0">5</span>
+                      <span className="truncate">Expected Closing</span>
                     </span>
-                    <span className="text-[10px] text-slate-500">(3 - 4)</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 shrink-0">(3-4)</span>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-xl sm:text-2xl font-black text-purple-300 font-mono">
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span className="text-lg sm:text-2xl font-black text-purple-300 font-mono truncate">
                       {reconData.expectedClosingLiters.toLocaleString()}
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">Liters</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-900">
-                    Book stock calculation
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-900 truncate">
+                    Book stock
                   </p>
                 </div>
 
                 {/* 6. Actual Physical Closing Stock (Input) */}
-                <div className="bg-slate-950/70 border-2 border-orange-500/40 rounded-xl p-3.5 flex flex-col justify-between bg-orange-500/5">
-                  <div className="flex items-center justify-between text-xs text-orange-400 font-bold mb-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-[10px] text-slate-950 font-bold">6</span>
-                      Actual Physical Stock
+                <div className="bg-slate-950/70 border-2 border-orange-500/40 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-orange-500/5">
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs text-orange-400 font-bold mb-1">
+                    <span className="flex items-center gap-1 sm:gap-1.5 truncate">
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-orange-500 flex items-center justify-center text-[9px] sm:text-[10px] text-slate-950 font-bold shrink-0">6</span>
+                      <span className="truncate">Actual Dip Stock</span>
                     </span>
-                    <span className="text-[10px] bg-orange-500/20 px-1.5 py-0.5 rounded text-orange-400">Dip Rod</span>
+                    <span className="text-[9px] bg-orange-500/20 px-1 py-0.2 rounded text-orange-400 shrink-0">Dip Rod</span>
                   </div>
-                  <div className="mt-1 flex items-baseline justify-between">
-                    <span className="text-xl sm:text-2xl font-black text-white font-mono">
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <span className="text-lg sm:text-2xl font-black text-white font-mono truncate">
                       {reconData.actualClosingLiters.toLocaleString()}
                     </span>
-                    <span className="text-xs text-slate-400 font-semibold">Liters</span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-slate-800 grid grid-cols-2 gap-1.5">
+                  <div className="mt-1.5 pt-1.5 border-t border-slate-800 grid grid-cols-2 gap-1">
                     <input
                       type="number"
-                      placeholder="Dip (cm)"
+                      placeholder="Dip cm"
                       value={actualDipCm}
                       onChange={(e) => {
                         setActualDipCm(e.target.value);
                         if (e.target.value) {
                           const cm = parseFloat(e.target.value);
-                          // approximate calibration: capacity * (dip / 260)
                           const approxLiters = Math.round(activeTank.capacityLiters * (cm / 260));
                           setActualClosingLiters(String(approxLiters));
                         }
                       }}
-                      className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-orange-500"
+                      className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] sm:text-xs text-white focus:outline-none focus:border-orange-500"
                     />
                     <input
                       type="number"
-                      placeholder="Actual Liters"
+                      placeholder="Liters"
                       value={actualClosingLiters}
                       onChange={(e) => setActualClosingLiters(e.target.value)}
-                      className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-orange-500 font-bold"
+                      className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] sm:text-xs text-white focus:outline-none focus:border-orange-500 font-bold"
                     />
                   </div>
                 </div>

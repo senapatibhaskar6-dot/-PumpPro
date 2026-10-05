@@ -18,6 +18,9 @@ import { AccountsAuditGuideModal } from './components/AccountsAuditGuideModal';
 import { NeonDatabaseModal } from './components/NeonDatabaseModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { StaffPanel } from './components/StaffPanel';
+import { StationRegistrationScreen } from './components/StationRegistrationScreen';
+import { SubscriptionLockScreen } from './components/SubscriptionLockScreen';
+import { OwnerPasswordModal } from './components/OwnerPasswordModal';
 import { storage } from './services/storage';
 import {
   PumpSettings,
@@ -34,7 +37,7 @@ import {
   PumpSubscription,
   RegisteredPump,
 } from './types';
-import { Menu, X, Fuel, SlidersHorizontal, DollarSign } from 'lucide-react';
+import { Menu, X, Fuel, SlidersHorizontal, DollarSign, Lock, ShieldAlert } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -45,10 +48,29 @@ export default function App() {
     return saved === 'owner' || saved === 'staff' ? saved : 'staff';
   });
 
+  // Owner & Management Security Lock State ("jate totkhanat belege hisab sabo nuare")
+  const [isOwnerUnlocked, setIsOwnerUnlocked] = useState<boolean>(() => storage.isOwnerUnlocked());
+  const [showOwnerPasswordModal, setShowOwnerPasswordModal] = useState<boolean>(false);
+
   const handleRoleChange = (role: 'staff' | 'owner') => {
+    if (role === 'owner') {
+      if (storage.isOwnerProtected() && !storage.isOwnerUnlocked()) {
+        setShowOwnerPasswordModal(true);
+        return;
+      }
+    }
     setActiveRole(role);
     if (typeof window !== 'undefined') {
       localStorage.setItem('pumppro_active_role', role);
+    }
+  };
+
+  const handleLockOwner = () => {
+    storage.lockOwnerAccess();
+    setIsOwnerUnlocked(false);
+    setActiveRole('staff');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pumppro_active_role', 'staff');
     }
   };
 
@@ -66,6 +88,8 @@ export default function App() {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(storage.getExpenses());
   const [subscription, setSubscription] = useState<PumpSubscription>(storage.getSubscription());
   const [registeredPumps, setRegisteredPumps] = useState<RegisteredPump[]>(storage.getRegisteredPumps());
+  const [isRegistered, setIsRegistered] = useState<boolean>(() => storage.isSetupCompleted());
+  const [isSubActive, setIsSubActive] = useState<boolean>(() => storage.isSubscriptionActive());
 
   // Modals
   const [showSubscriptionModal, setShowSubscriptionModal] = useState<boolean>(false);
@@ -94,6 +118,9 @@ export default function App() {
     setExpenses(storage.getExpenses());
     setSubscription(storage.getSubscription());
     setRegisteredPumps(storage.getRegisteredPumps());
+    setIsRegistered(storage.isSetupCompleted());
+    setIsSubActive(storage.isSubscriptionActive());
+    setIsOwnerUnlocked(storage.isOwnerUnlocked());
   }, []);
 
   // Listen for data sync events
@@ -111,8 +138,37 @@ export default function App() {
   const lowStockCount = lubricants.filter((l) => l.currentStock <= l.lowStockThreshold).length;
   const unpaidCreditsCount = creditSlips.filter((s) => !s.isPaid).length;
 
+  // First-Time Station Setup / Registration Gate
+  if (!isRegistered) {
+    return (
+      <StationRegistrationScreen
+        onCompleteRegistration={(_newPump) => {
+          refreshData();
+          setIsRegistered(true);
+          setIsSubActive(storage.isSubscriptionActive());
+          setCurrentTab('dashboard');
+        }}
+      />
+    );
+  }
+
+  // Auto-Lock Gate when subscription expires or is ended ("subscribe khek hole autolock hobo")
+  if (!isSubActive) {
+    return (
+      <SubscriptionLockScreen
+        subscription={subscription}
+        settings={settings}
+        onUnlocked={() => {
+          refreshData();
+          setIsSubActive(true);
+          setCurrentTab('dashboard');
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-orange-500 selection:text-white max-w-full overflow-x-hidden">
       {/* Top Navbar */}
       <Navbar
         settings={settings}
@@ -154,7 +210,7 @@ export default function App() {
         />
 
         {/* Content Body Area */}
-        <main className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6 pb-28 lg:pb-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 sm:px-6 sm:py-5 lg:px-8 lg:py-6 pb-28 lg:pb-8">
           <div className="max-w-7xl mx-auto">
             {currentTab === 'dashboard' && (
               activeRole === 'staff' ? (
@@ -298,6 +354,7 @@ export default function App() {
                 tanks={tanks}
                 nozzles={nozzles}
                 onRefreshData={refreshData}
+                onReopenRegistration={() => setIsRegistered(false)}
               />
             )}
           </div>

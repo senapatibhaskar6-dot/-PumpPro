@@ -37,6 +37,9 @@ const STORAGE_KEYS = {
   REGISTERED_PUMPS: 'pumppro_registered_pumps',
   TANKER_RECEIPTS: 'pumppro_tanker_receipts',
   STOCK_RECONCILIATIONS: 'pumppro_stock_reconciliations',
+  SETUP_COMPLETED: 'pumppro_setup_completed',
+  OWNER_SECURITY: 'pumppro_owner_security',
+  OWNER_SESSION_UNLOCKED: 'pumppro_owner_session_unlocked',
 };
 
 // Initial default settings
@@ -49,6 +52,9 @@ export const DEFAULT_SETTINGS: PumpSettings = {
   phone: '+91 98200 44555',
   email: 'ops@highwaystarfuel.com',
   currencySymbol: '₹',
+  ownerPassword: '1234',
+  isOwnerProtected: true,
+  autoLockMinutes: 0,
 };
 
 // Default Fuel Rates
@@ -1338,6 +1344,55 @@ class StorageService {
     this.setItem(STORAGE_KEYS.SUBSCRIPTION, sub);
   }
 
+  // Check if active subscription payment is valid (Auto-Locks when subscription expires)
+  isSubscriptionActive(): boolean {
+    try {
+      const sub = this.getSubscription();
+      if (!sub) return false;
+      if (sub.status !== 'Active') return false;
+
+      // Check currentPeriodEnd date vs today
+      if (sub.currentPeriodEnd) {
+        const now = new Date();
+        const end = new Date(sub.currentPeriodEnd);
+        end.setHours(23, 59, 59, 999);
+        const diffMs = end.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 0) {
+          // Auto-lock when subscription ends!
+          sub.status = 'Expired';
+          sub.daysRemaining = 0;
+          this.saveSubscription(sub);
+          return false;
+        } else if (sub.daysRemaining !== diffDays) {
+          sub.daysRemaining = diffDays;
+          this.saveSubscription(sub);
+        }
+      } else if (sub.daysRemaining <= 0) {
+        sub.status = 'Expired';
+        this.saveSubscription(sub);
+        return false;
+      }
+
+      return sub.status === 'Active' && sub.daysRemaining > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  // Helper for testing: simulate subscription expiration to test auto-lock
+  expireSubscriptionForTesting(): void {
+    const sub = this.getSubscription();
+    sub.status = 'Expired';
+    sub.daysRemaining = 0;
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    sub.currentPeriodEnd = yesterday;
+    sub.renewalDate = yesterday;
+    this.saveSubscription(sub);
+    window.dispatchEvent(new Event('pumppro_data_changed'));
+  }
+
   renewSubscription(
     planCycle: 'monthly' | 'annual',
     paymentMode: 'UPI / QR' | 'Credit / Debit Card' | 'Net Banking' | 'Auto-Debit',
@@ -1471,6 +1526,173 @@ class StorageService {
     sub.ownerName = target.ownerName;
     sub.ownerMobile = target.ownerPhone;
     this.saveSubscription(sub);
+  }
+
+  // Setup / First-Time Registration Status
+  isSetupCompleted(): boolean {
+    try {
+      const val = localStorage.getItem(STORAGE_KEYS.SETUP_COMPLETED);
+      if (val === 'true') return true;
+      if (val === 'false') return false;
+
+      // Check if user has already customized or registered a pump
+      const storedPumps = localStorage.getItem(STORAGE_KEYS.REGISTERED_PUMPS);
+      if (storedPumps) {
+        const parsed = JSON.parse(storedPumps);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.some(p => p.isActive && p.stationName && p.roCode)) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  setSetupCompleted(completed: boolean): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETUP_COMPLETED, String(completed));
+      this.persistToNeon(STORAGE_KEYS.SETUP_COMPLETED, { completed });
+      window.dispatchEvent(new Event('pumppro_data_changed'));
+    } catch (e) {
+      console.error('Error saving setup completion state:', e);
+    }
+  }
+
+  resetSetup(): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETUP_COMPLETED, 'false');
+      window.dispatchEvent(new Event('pumppro_data_changed'));
+    } catch (e) {
+      console.error('Error resetting setup status:', e);
+    }
+  }
+
+  // Owner & Management Security Password Protection ("jate totkhanat belege hisab sabo nuare")
+  getOwnerSecurity(): { isProtected: boolean; hasPassword: boolean; autoLockMinutes: number; passwordHint: string } {
+    try {
+      const settings = this.getSettings();
+      const pwd = settings.ownerPassword || '1234';
+      const isProtected = settings.isOwnerProtected ?? true;
+      const autoLock = settings.autoLockMinutes ?? 0;
+      return {
+        isProtected,
+        hasPassword: Boolean(pwd),
+        autoLockMinutes: autoLock,
+        passwordHint: pwd ? `${pwd.slice(0, 1)}${'*'.repeat(Math.max(0, pwd.length - 2))}${pwd.slice(-1)}` : '****',
+      };
+    } catch {
+      return { isProtected: true, hasPassword: true, autoLockMinutes: 0, passwordHint: '****' };
+    }
+  }
+
+  isOwnerProtected(): boolean {
+    const settings = this.getSettings();
+    return settings.isOwnerProtected ?? true;
+  }
+
+  getOwnerPassword(): string {
+    const settings = this.getSettings();
+    return settings.ownerPassword || '1234';
+  }
+
+  verifyOwnerPassword(input: string): boolean {
+    if (!input) return false;
+    const settings = this.getSettings();
+    const actual = settings.ownerPassword || '1234';
+    return input.trim() === actual.trim();
+  }
+
+  setOwnerPassword(newPassword: string, isProtected: boolean = true, autoLockMinutes: number = 0): void {
+    const settings = this.getSettings();
+    settings.ownerPassword = newPassword.trim();
+    settings.isOwnerProtected = isProtected;
+    settings.autoLockMinutes = autoLockMinutes;
+    this.saveSettings(settings);
+
+    // Also sync to active registered pump
+    const pumps = this.getRegisteredPumps();
+    const activePump = pumps.find(p => p.isActive);
+    if (activePump) {
+      activePump.ownerPassword = newPassword.trim();
+      activePump.isOwnerProtected = isProtected;
+      this.saveRegisteredPumps(pumps);
+    }
+    window.dispatchEvent(new Event('pumppro_data_changed'));
+  }
+
+  // Emergency / Forgot Password recovery using registered station RO Code + Mobile
+  resetOwnerPasswordWithVerification(roCode: string, ownerPhone: string, newPassword: string): boolean {
+    const settings = this.getSettings();
+    const pumps = this.getRegisteredPumps();
+    const activePump = pumps.find(p => p.isActive) || pumps[0];
+
+    const cleanInputRo = roCode.trim().toLowerCase();
+    const cleanInputPhone = ownerPhone.trim().replace(/\D/g, '');
+
+    const settingsRo = (settings.dealerCode || '').toLowerCase();
+    const settingsPhone = (settings.phone || '').replace(/\D/g, '');
+
+    const pumpRo = (activePump?.roCode || '').toLowerCase();
+    const pumpPhone = (activePump?.ownerPhone || '').replace(/\D/g, '');
+
+    const matchesRo = cleanInputRo === settingsRo || cleanInputRo === pumpRo;
+    const matchesPhone = cleanInputPhone.length >= 10 && (
+      settingsPhone.includes(cleanInputPhone) ||
+      pumpPhone.includes(cleanInputPhone) ||
+      cleanInputPhone === settingsPhone ||
+      cleanInputPhone === pumpPhone
+    );
+
+    if (matchesRo && matchesPhone) {
+      this.setOwnerPassword(newPassword, true, settings.autoLockMinutes ?? 0);
+      this.setOwnerUnlocked(true);
+      return true;
+    }
+    return false;
+  }
+
+  // Session Unlock Status
+  isOwnerUnlocked(): boolean {
+    if (!this.isOwnerProtected()) return true;
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEYS.OWNER_SESSION_UNLOCKED);
+      if (!stored) return false;
+      const parsed = JSON.parse(stored);
+      if (!parsed || !parsed.unlocked) return false;
+
+      const autoLock = this.getSettings().autoLockMinutes ?? 0;
+      if (autoLock > 0) {
+        const elapsedMinutes = (Date.now() - (parsed.timestamp || 0)) / 60000;
+        if (elapsedMinutes > autoLock) {
+          this.lockOwnerAccess();
+          return false;
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  setOwnerUnlocked(unlocked: boolean): void {
+    try {
+      if (unlocked) {
+        sessionStorage.setItem(
+          STORAGE_KEYS.OWNER_SESSION_UNLOCKED,
+          JSON.stringify({ unlocked: true, timestamp: Date.now() })
+        );
+      } else {
+        sessionStorage.removeItem(STORAGE_KEYS.OWNER_SESSION_UNLOCKED);
+      }
+    } catch (e) {
+      console.error('Session storage error:', e);
+    }
+    window.dispatchEvent(new Event('pumppro_data_changed'));
+  }
+
+  lockOwnerAccess(): void {
+    this.setOwnerUnlocked(false);
   }
 
   // Tanker Delivery Receipts (TT Decantations)

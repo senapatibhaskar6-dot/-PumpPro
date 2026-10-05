@@ -15,6 +15,7 @@ import {
   Phone,
   Layers,
   ArrowRight,
+  Lock,
 } from 'lucide-react';
 import { PumpSubscription, RegisteredPump, PumpSettings } from '../types';
 import { storage } from '../services/storage';
@@ -63,6 +64,20 @@ export const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              if (confirm('পাম্পপ্ৰ’ চাবস্ক্ৰিপচনৰ ম্যাদ শেষ কৰি অটো-লক পৰীক্ষা কৰিব বিচাৰে নেকি? (Simulate subscription expiry & auto-lock?)')) {
+                storage.expireSubscriptionForTesting();
+                onRefreshData();
+              }
+            }}
+            className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs px-3.5 py-2.5 rounded-xl transition cursor-pointer"
+            title="Simulate Subscription Expiration & Test Auto-Lock"
+          >
+            <Lock className="w-4 h-4 text-red-400" />
+            <span>Test Auto-Lock (লক পৰীক্ষা)</span>
+          </button>
+
           <button
             onClick={onOpenRegisterPumpModal}
             className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs px-4 py-2.5 rounded-xl transition cursor-pointer"

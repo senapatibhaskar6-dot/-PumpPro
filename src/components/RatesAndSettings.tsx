@@ -15,6 +15,11 @@ import {
   Info,
   ShieldCheck,
   Zap,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   FuelRate,
@@ -30,6 +35,8 @@ interface RatesAndSettingsProps {
   tanks: TankStock[];
   nozzles: Nozzle[];
   onRefreshData: () => void;
+  onReopenRegistration?: () => void;
+  onLockOwner?: () => void;
 }
 
 export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
@@ -38,9 +45,11 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
   tanks,
   nozzles,
   onRefreshData,
+  onReopenRegistration,
+  onLockOwner,
 }) => {
   const sym = settings.currencySymbol;
-  const [activeSubTab, setActiveSubTab] = useState<'rates' | 'tanks' | 'station' | 'backup'>('rates');
+  const [activeSubTab, setActiveSubTab] = useState<'rates' | 'tanks' | 'station' | 'security' | 'backup'>('rates');
 
   // Rates State
   const [editableRates, setEditableRates] = useState<FuelRate[]>(rates);
@@ -50,6 +59,13 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
 
   // Tank Dips State
   const [editableTanks, setEditableTanks] = useState<TankStock[]>(tanks);
+
+  // Owner Security State
+  const [ownerPasswordInput, setOwnerPasswordInput] = useState<string>(() => storage.getOwnerPassword());
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState<string>(() => storage.getOwnerPassword());
+  const [isProtectedToggle, setIsProtectedToggle] = useState<boolean>(() => storage.isOwnerProtected());
+  const [autoLockMins, setAutoLockMins] = useState<number>(settings.autoLockMinutes ?? 0);
+  const [showSecPassword, setShowSecPassword] = useState<boolean>(false);
 
   // Backup text
   const [backupJson, setBackupJson] = useState<string>('');
@@ -122,6 +138,27 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
     storage.saveSettings(stationForm);
     onRefreshData();
     setFeedback('Petrol Pump Station Profile updated!');
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  // Handle Security & PIN Save
+  const handleSaveSecurity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isProtectedToggle) {
+      if (!ownerPasswordInput.trim() || ownerPasswordInput.trim().length < 4) {
+        setFeedback('Error: Password must be at least 4 characters long! (পাছৱৰ্ড কমেও ৪টা অক্ষৰ হ’ব লাগিব)');
+        setTimeout(() => setFeedback(null), 4000);
+        return;
+      }
+      if (ownerPasswordInput !== confirmPasswordInput) {
+        setFeedback('Error: Passwords do not match! (পাছৱৰ্ড দুয়োটা মিলি যোৱা নাই)');
+        setTimeout(() => setFeedback(null), 4000);
+        return;
+      }
+    }
+    storage.setOwnerPassword(ownerPasswordInput, isProtectedToggle, autoLockMins);
+    onRefreshData();
+    setFeedback('Owner & Management Security settings saved successfully (হিচাপ সুৰক্ষা সংৰক্ষণ হ’ল)!');
     setTimeout(() => setFeedback(null), 4000);
   };
 
@@ -211,6 +248,17 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
             }`}
           >
             Station Profile
+          </button>
+          <button
+            onClick={() => setActiveSubTab('security')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
+              activeSubTab === 'security'
+                ? 'bg-orange-500 text-white shadow-xs'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Security & PIN</span>
           </button>
           <button
             onClick={() => setActiveSubTab('backup')}
@@ -525,13 +573,209 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex items-center justify-between flex-wrap gap-2">
+              {onReopenRegistration && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('পাম্প পঞ্জীয়ন স্ক্ৰীণ পুনৰ খুলিব বিচাৰে নেকি? (Do you want to re-open the First-Time Station Setup & Registration wizard?)')) {
+                      storage.resetSetup();
+                      onReopenRegistration();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 font-bold bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 px-4 py-2 rounded-xl transition cursor-pointer"
+                >
+                  <Building className="w-3.5 h-3.5" />
+                  <span>পঞ্জীয়ন স্ক্ৰীণ পুনৰ খোলক (Re-run Registration Wizard)</span>
+                </button>
+              )}
+
               <button
                 type="submit"
-                className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-orange-500/20 active:scale-95 transition cursor-pointer"
+                className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-orange-500/20 active:scale-95 transition cursor-pointer ml-auto"
               >
                 <Save className="w-4 h-4" />
                 <span>Save Station Profile</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* SUBTAB: OWNER & MANAGEMENT SECURITY */}
+      {activeSubTab === 'security' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <Lock className="w-5 h-5" />
+                </span>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>Owner & Management Security PIN (হিচাপ সুৰক্ষা ব্যৱস্থা)</span>
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                মালিক আৰু মেনেজমেন্টৰ গোপন হিচাপ, দৈনিক লাভ-লোকচান, কেচ মেলা আৰু বেংক একাউণ্ট আনে চাব নোৱাৰাকৈ পাছৱৰ্ডেৰে লক কৰক।
+              </p>
+            </div>
+
+            {/* Quick Lock Now Button */}
+            {onLockOwner && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('এতিয়াই অ’নাৰ পেনেল লক কৰি ষ্টাফ মোডলৈ যাব বিচাৰে নেকি? (Lock owner access now and switch to staff view?)')) {
+                    onLockOwner();
+                  }
+                }}
+                className="flex items-center gap-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+              >
+                <Lock className="w-4 h-4 text-rose-400" />
+                <span>🔒 এতিয়াই হিচাপ লক কৰক (Lock Now)</span>
+              </button>
+            )}
+          </div>
+
+          {/* Security Status Card */}
+          <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-teal-950/30 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Owner Hisab Protection:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                    isProtectedToggle
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}>
+                    {isProtectedToggle ? 'Active & Protected' : 'Protection Disabled'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {isProtectedToggle
+                    ? 'ষ্টেচনৰ অ’নাৰ মোড আৰু ফাইনেন্স পেনেল পাছৱৰ্ডেৰে সুৰক্ষিত হৈ আছে।'
+                    : 'পাছৱৰ্ড সুৰক্ষা অফ কৰা আছে। যেতিয়াই অ’নাৰ মোড অন কৰিব পাৰিব।'}
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <div className="flex items-center gap-3 bg-slate-950/80 px-4 py-2 rounded-xl border border-slate-800">
+              <span className="text-xs font-bold text-slate-300">পাছৱৰ্ড সুৰক্ষা:</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isProtectedToggle}
+                  onChange={(e) => setIsProtectedToggle(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
+          </div>
+
+          {/* Form to change PIN / Password */}
+          <form onSubmit={handleSaveSecurity} className="space-y-4">
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+              <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-orange-400" />
+                <span>Change Owner PIN / Password (পাছৱৰ্ড সলনি কৰক)</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* New PIN */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>New PIN / Password (নতুন পাছৱৰ্ড)</span>
+                    <span className="text-[10px] text-slate-500">Min 4 chars / digits</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSecPassword ? 'text' : 'password'}
+                      placeholder="e.g. 1234 or Secret@2026"
+                      value={ownerPasswordInput}
+                      onChange={(e) => setOwnerPasswordInput(e.target.value)}
+                      className="w-full pl-9 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                    <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecPassword(!showSecPassword)}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-white transition cursor-pointer"
+                    >
+                      {showSecPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm PIN */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Confirm PIN (পাছৱৰ্ড নিশ্চিত কৰক)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSecPassword ? 'text' : 'password'}
+                      placeholder="Repeat PIN / password"
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Auto-Lock Inactivity Configuration */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Auto-Lock Timeout (স্বয়ংক্ৰিয় লক সময়সীমা)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Immediate on Exit / Staff Switch (লগে লগে লক)', val: 0 },
+                    { label: 'After 5 Minutes (৫ মিনিট পাছত)', val: 5 },
+                    { label: 'After 15 Minutes (১৫ মিনিট পাছত)', val: 15 },
+                    { label: 'After 30 Minutes (৩০ মিনিট পাছত)', val: 30 },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setAutoLockMins(opt.val)}
+                      className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition cursor-pointer ${
+                        autoLockMins === opt.val
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Emergency Recovery Info */}
+            <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-amber-300">জৰুৰীকালীন ৰিকভাৰী (Forgot Password Recovery):</strong>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  পাছৱৰ্ড পাহৰিলে আনলক স্ক্ৰীণত "পাছৱৰ্ড পাহৰিলে?" বিকল্পত ক্লিক কৰি পাম্পৰ RO ক’ড ({settings.dealerCode}) আৰু পঞ্জীভুক্ত মবাইল নম্বৰ ({settings.phone}) দি লগে লগে নতুন পাছৱৰ্ড ছেট কৰিব পাৰিব।
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="submit"
+                className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Security PIN & Settings</span>
               </button>
             </div>
           </form>

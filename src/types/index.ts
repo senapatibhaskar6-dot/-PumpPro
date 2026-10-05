@@ -213,6 +213,18 @@ export interface PumpSettings {
   phone: string;
   email: string;
   currencySymbol: string; // e.g. "₹" or "$"
+  // Owner & Management Security Password / PIN
+  ownerPassword?: string;
+  isOwnerProtected?: boolean;
+  autoLockMinutes?: number; // 0 = immediate on exit, 5, 15, 30, etc.
+}
+
+export interface OwnerSecurityConfig {
+  isProtected: boolean;
+  password: string;
+  autoLockMinutes: number;
+  lastUnlockedTimestamp: number;
+  updatedAt: string;
 }
 
 export type SubscriptionStatus = 'Active' | 'Trial' | 'Grace' | 'Expired';
@@ -281,6 +293,8 @@ export interface RegisteredPump {
   registeredDate: string;
   planStatus: SubscriptionStatus;
   isActive: boolean;
+  ownerPassword?: string;
+  isOwnerProtected?: boolean;
 }
 
 export interface TankerReceipt {
