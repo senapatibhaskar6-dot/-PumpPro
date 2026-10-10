@@ -100,7 +100,7 @@ export const AccountsAuditGuideModal: React.FC<AccountsAuditGuideModalProps> = (
       descriptionAssamese:
         'তেল কোম্পানীয়ে যেতিয়া পেট্ৰ’ল বা ডিজেলৰ দাম সলনি কৰে, "Settings & Rates" টেবত গৈ নতুন Selling Rate আৰু Dealer Cost আপডেট কৰক। চিস্টেমে আপোনাৰ প্ৰতি লিটাৰৰ মাৰ্জিন নিজে গণনা কৰিব।',
       descriptionEnglish:
-        'Whenever oil companies revise fuel rates, enter the revised Dealer Cost and Retail Selling Price in the Rates tab. PumpPro automatically calculates dealer margins per liter.',
+        'Whenever oil companies revise fuel rates, enter the revised Dealer Cost and Retail Selling Price in the Rates tab. PumpTally automatically calculates dealer margins per liter.',
       statusText: `${rates.length} টা ইন্ধন সক্ৰিয় আছে (Petrol, Diesel, Premium)`,
       isDone: rates.length > 0,
     },
@@ -160,7 +160,7 @@ export const AccountsAuditGuideModal: React.FC<AccountsAuditGuideModalProps> = (
       descriptionAssamese:
         'হাতত থকা ৫০০, ২০০, ১০০ টকীয়া নোট গণনা কৰি বহুৱাওক আৰু GooglePay/PhonePe/QR ৰ টকা দিয়ক। চিস্টেমে হিচাপ কৰি দেখুৱাব কোনো ঘাটতি (Shortage) বা অতিৰিক্ত (Excess) হৈছে নে নাই!',
       descriptionEnglish:
-        'Input denomination note counts (500, 200, 100) and UPI/card sums. PumpPro immediately computes exact drawer variance (Zero Shortage validation).',
+        'Input denomination note counts (500, 200, 100) and UPI/card sums. PumpTally immediately computes exact drawer variance (Zero Shortage validation).',
       statusText: `মুঠ বাকী থকা কেচ প্ৰত্যাশা: ${sym}${expectedCounterCash.toFixed(0)}`,
       isDone: true,
     },
@@ -200,7 +200,7 @@ export const AccountsAuditGuideModal: React.FC<AccountsAuditGuideModalProps> = (
             হিচাপ ক'ত, কেনেকৈ আপডেট কৰিব আৰু ঠিকে আছে নে চাওক
           </h2>
           <p className="text-xs text-slate-400">
-            PumpPro ত আপোনাৰ পেট্ৰ’ল পাম্পৰ নজল ৰিডিং, মবিলৰ মজুত, বাকী খাতা আৰু কেচ ড্ৰয়াৰ ১০০% নিৰ্ভুলভাৱে পৰিচালনা কৰাৰ সম্পূৰ্ণ নিৰ্দেশনা।
+            PumpTally ত আপোনাৰ পেট্ৰ’ল পাম্পৰ নজল ৰিডিং, মবিলৰ মজুত, বাকী খাতা আৰু কেচ ড্ৰয়াৰ ১০০% নিৰ্ভুলভাৱে পৰিচালনা কৰাৰ সম্পূৰ্ণ নিৰ্দেশনা।
           </p>
         </div>
 

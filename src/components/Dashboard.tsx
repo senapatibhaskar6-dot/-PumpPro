@@ -193,6 +193,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const todayStr = getTodayDateString();
   const allRecons = storage.getStockReconciliations();
+  const latestDensity = storage.getLatestDailyDensity();
+  const petrolRef = settings.petrolStandardDensity || 742.0;
+  const dieselRef = settings.dieselStandardDensity || 832.0;
   const todayStockRecons = useMemo(() => {
     return tanks.map((tank) => {
       const saved = allRecons.find((r) => r.tankId === tank.id && r.date === todayStr);
@@ -387,6 +390,94 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <HelpCircle className="w-4 h-4" />
             <span>হিচাপ ক'ত কিদৰে চাব? (Guide & Audit)</span>
           </button>
+        </div>
+
+        {/* Daily Fuel Density Verification & Adulteration Status Strip */}
+        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                <Droplet className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-extrabold text-white">
+                    Fuel Density Verification & Quality Audit
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-sky-400 border border-sky-500/30">
+                    ASTM-53B @ 15°C
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Official standards: Petrol {petrolRef.toFixed(1)} kg/m³ | Diesel {dieselRef.toFixed(1)} kg/m³ (Tolerance ±3.0 kg/m³)
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigate('fuel-stock')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-xs font-bold transition self-start sm:self-auto cursor-pointer"
+            >
+              <Droplet className="w-3.5 h-3.5" />
+              <span>Verify & Audit Density (ঘনত্ব পৰীক্ষা) →</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Petrol Density Tile */}
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-orange-400 flex items-center gap-1">
+                  <Fuel className="w-3.5 h-3.5" />
+                  <span>Petrol (MS) Density</span>
+                </span>
+                <div className="text-sm font-mono font-black text-white mt-1">
+                  Observed: {latestDensity ? latestDensity.petrolDensityObserved.toFixed(1) : petrolRef.toFixed(1)} kg/m³
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  Official Ref: {petrolRef.toFixed(1)} kg/m³ (Diff: {latestDensity ? (latestDensity.petrolVariance > 0 ? `+${latestDensity.petrolVariance}` : latestDensity.petrolVariance) : '0.0'} kg/m³)
+                </span>
+              </div>
+              <span
+                className={`px-2.5 py-1 rounded-lg text-xs font-black ${
+                  (latestDensity?.petrolStatus || 'Normal') === 'Normal'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : latestDensity?.petrolStatus === 'Warning'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'bg-rose-500 text-white animate-pulse'
+                }`}
+              >
+                {(latestDensity?.petrolStatus || 'Normal') === 'Normal' ? '✓ 100% PURE' : latestDensity?.petrolStatus === 'Warning' ? '⚠ TOLERANCE' : '🚨 ADULTERATION ALERT'}
+              </span>
+            </div>
+
+            {/* Diesel Density Tile */}
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-sky-400 flex items-center gap-1">
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Diesel (HSD) Density</span>
+                </span>
+                <div className="text-sm font-mono font-black text-white mt-1">
+                  Observed: {latestDensity ? latestDensity.dieselDensityObserved.toFixed(1) : dieselRef.toFixed(1)} kg/m³
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  Official Ref: {dieselRef.toFixed(1)} kg/m³ (Diff: {latestDensity ? (latestDensity.dieselVariance > 0 ? `+${latestDensity.dieselVariance}` : latestDensity.dieselVariance) : '0.0'} kg/m³)
+                </span>
+              </div>
+              <span
+                className={`px-2.5 py-1 rounded-lg text-xs font-black ${
+                  (latestDensity?.dieselStatus || 'Normal') === 'Normal'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : latestDensity?.dieselStatus === 'Warning'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'bg-rose-500 text-white animate-pulse'
+                }`}
+              >
+                {(latestDensity?.dieselStatus || 'Normal') === 'Normal' ? '✓ 100% PURE' : latestDensity?.dieselStatus === 'Warning' ? '⚠ TOLERANCE' : '🚨 ADULTERATION ALERT'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Daily Fuel Stock Reconciliation & Shortage/Gain Audit (Core User Requirement) */}
@@ -670,13 +761,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
                   <Droplet className="w-4 h-4" />
                 </div>
-                <h2 className="text-base font-bold text-white">Underground Tank Dips</h2>
+                <h2 className="text-base font-bold text-white">Underground Tank Stock (Liters)</h2>
               </div>
               <button
                 onClick={() => onNavigate('settings')}
                 className="text-xs text-sky-400 hover:text-sky-300 font-semibold cursor-pointer"
               >
-                Update Dips
+                + Manage Tanks & Nozzles
               </button>
             </div>
 
@@ -700,7 +791,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   >
                     <div className="flex items-center justify-between text-xs font-semibold">
                       <span className="text-white truncate max-w-[170px]">{tank.name}</span>
-                      <span className="font-mono text-sky-400 font-bold">
+                      <span className="font-mono text-emerald-400 font-bold">
                         {percentage}% ({tank.currentVolumeLiters.toLocaleString()} L)
                       </span>
                     </div>
@@ -715,7 +806,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
                       <span>
-                        Current Dip: <strong className="text-slate-200 font-mono">{tank.dipReadingCm} cm</strong>
+                        Current Stock: <strong className="text-emerald-400 font-mono">{tank.currentVolumeLiters.toLocaleString()} L</strong>
                       </span>
                       <span>
                         Capacity: <strong className="text-slate-200 font-mono">{tank.capacityLiters.toLocaleString()} L</strong>
@@ -730,9 +821,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>All tank sensors calibrated</span>
+                <span>Direct Liters Stock Tracking Active</span>
               </span>
-              <span className="text-slate-400 font-mono">Dip verified</span>
+              <span className="text-emerald-400 font-mono font-semibold">Liters System</span>
             </div>
 
             {/* Fuel Stock & Shortage Reconciliation Hub Button */}

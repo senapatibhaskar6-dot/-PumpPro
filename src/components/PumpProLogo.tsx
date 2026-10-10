@@ -30,14 +30,14 @@ export const PumpProLogo: React.FC<LogoProps> = ({
       {!imgError ? (
         <img
           src={logoAsset || '/logo.png'}
-          alt="PumpPro Petrol Pump Management"
-          className={`${currentSizeClass} w-auto object-contain transition-transform duration-200 hover:scale-[1.03] drop-shadow-md`}
+          alt="PumpTally Petrol Pump Management"
+          className={`${currentSizeClass} w-auto object-contain transition-transform duration-200 hover:scale-[1.03] drop-shadow-sm`}
           onError={() => setImgError(true)}
         />
       ) : (
         <div className="flex items-center gap-2">
-          <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-orange-400 via-amber-400 to-sky-400 bg-clip-text text-transparent tracking-tight">
-            PUMP PRO
+          <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-orange-500 via-amber-500 to-sky-600 bg-clip-text text-transparent tracking-tight">
+            PUMPTALLY
           </span>
         </div>
       )}

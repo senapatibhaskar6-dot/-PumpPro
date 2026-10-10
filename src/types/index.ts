@@ -217,6 +217,10 @@ export interface PumpSettings {
   ownerPassword?: string;
   isOwnerProtected?: boolean;
   autoLockMinutes?: number; // 0 = immediate on exit, 5, 15, 30, etc.
+  // Official / Reference Standard Density (kg/m³ @ 15°C)
+  petrolStandardDensity?: number; // default 742.0 kg/m³ (Range 720-775)
+  dieselStandardDensity?: number; // default 832.0 kg/m³ (Range 820-860)
+  densityTolerance?: number; // default ±3.0 kg/m³
 }
 
 export interface OwnerSecurityConfig {
@@ -248,7 +252,7 @@ export interface SubscriptionInvoice {
 
 export interface PumpSubscription {
   id: string;
-  planName: string; // "PumpPro Multi-Pump Commercial"
+  planName: string; // "PumpTally Multi-Pump Commercial"
   pricePerPumpMonthly: number; // 999
   pricePerPumpAnnual: number; // 9990
   activePumpsCount: number; // e.g. 2
@@ -347,4 +351,29 @@ export interface DailyFuelStockReconciliation {
   remarks?: string;
   timestamp: number;
 }
+
+export type DensityQualityStatus = 'Normal' | 'Warning' | 'Adulteration Alert';
+
+export interface DailyDensityRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  shift: string; // e.g. "Shift 1 (Morning)"
+  // Petrol (Motor Spirit / MS)
+  petrolDensityObserved: number; // Observed at 15°C in kg/m³
+  petrolOfficialDensity: number; // Official reference standard (e.g. 742.0)
+  petrolTemperature?: number; // In °C
+  petrolVariance: number; // observed - official
+  petrolStatus: DensityQualityStatus; // 'Normal' (<=1.5), 'Warning' (<=3.0), 'Adulteration Alert' (>3.0)
+  // Diesel (High Speed Diesel / HSD)
+  dieselDensityObserved: number; // Observed at 15°C in kg/m³
+  dieselOfficialDensity: number; // Official reference standard (e.g. 832.0)
+  dieselTemperature?: number; // In °C
+  dieselVariance: number; // observed - official
+  dieselStatus: DensityQualityStatus; // 'Normal' (<=1.5), 'Warning' (<=3.0), 'Adulteration Alert' (>3.0)
+  // Inspector & remarks
+  recordedBy: string;
+  remarks?: string;
+  timestamp: number;
+}
+
 

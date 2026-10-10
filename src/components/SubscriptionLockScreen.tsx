@@ -103,7 +103,7 @@ export const SubscriptionLockScreen: React.FC<SubscriptionLockScreenProps> = ({
               Subscription renewed for {validityText}. Unlocking your station dashboard...
             </p>
             <div className="text-[11px] text-slate-400 font-mono">
-              Tax Invoice Generated • PumpPro Commercial Plan Active
+              Tax Invoice Generated • PumpTally Commercial Plan Active
             </div>
           </div>
         ) : (
@@ -288,7 +288,7 @@ export const SubscriptionLockScreen: React.FC<SubscriptionLockScreenProps> = ({
         {/* Security & Commercial Invoicing Note */}
         <div className="text-center space-y-1 text-[11px] text-slate-500">
           <p>
-            PumpPro OS Commercial Security • Automatic GST Tax Invoice generated on payment confirmation.
+            PumpTally OS Commercial Security • Automatic GST Tax Invoice generated on payment confirmation.
           </p>
           <p>
             Supports Multi-Pump Retail Outlets & 24×7 Highway Fuel Dispensation.

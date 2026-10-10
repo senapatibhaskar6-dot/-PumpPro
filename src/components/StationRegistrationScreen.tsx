@@ -22,6 +22,9 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  Plus,
+  Minus,
+  Trash2,
 } from 'lucide-react';
 import { PumpProLogo } from './PumpProLogo';
 import { RegisteredPump, PumpSettings } from '../types';
@@ -47,9 +50,85 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
   const [district, setDistrict] = useState('Kamrup Metro');
   const [state, setState] = useState('Assam');
   const [pincode, setPincode] = useState('781001');
-  const [nozzlesCount, setNozzlesCount] = useState<number>(6);
-  const [tanksCount, setTanksCount] = useState<number>(3);
   const [initialShift, setInitialShift] = useState<string>('Shift 1 (Morning)');
+
+  // Dynamic Plus [+] System for Tanks & Nozzles (User Request: "fixed nokori plus system kori diyok")
+  interface RegTank {
+    id: string;
+    name: string;
+    fuelType: 'petrol' | 'diesel' | 'premium_petrol' | 'cng';
+    capacityLiters: number;
+    currentVolumeLiters: number;
+  }
+
+  interface RegNozzle {
+    id: string;
+    dispenserUnit: string;
+    nozzleNumber: number;
+    name: string;
+    fuelType: 'petrol' | 'diesel' | 'premium_petrol' | 'cng';
+    tankId: string;
+  }
+
+  const [customTanks, setCustomTanks] = useState<RegTank[]>([
+    { id: 'tank-1', name: 'Tank 1 - MS Petrol', fuelType: 'petrol', capacityLiters: 25000, currentVolumeLiters: 15000 },
+    { id: 'tank-2', name: 'Tank 2 - HSD Diesel', fuelType: 'diesel', capacityLiters: 35000, currentVolumeLiters: 22000 },
+    { id: 'tank-3', name: 'Tank 3 - XP95 Premium', fuelType: 'premium_petrol', capacityLiters: 15000, currentVolumeLiters: 9000 },
+  ]);
+
+  const [customNozzles, setCustomNozzles] = useState<RegNozzle[]>([
+    { id: 'noz-1', dispenserUnit: 'DU-01', nozzleNumber: 1, name: 'DU-01 Nozzle 1 (Petrol)', fuelType: 'petrol', tankId: 'tank-1' },
+    { id: 'noz-2', dispenserUnit: 'DU-01', nozzleNumber: 2, name: 'DU-01 Nozzle 2 (Diesel)', fuelType: 'diesel', tankId: 'tank-2' },
+    { id: 'noz-3', dispenserUnit: 'DU-02', nozzleNumber: 1, name: 'DU-02 Nozzle 1 (Petrol)', fuelType: 'petrol', tankId: 'tank-1' },
+    { id: 'noz-4', dispenserUnit: 'DU-02', nozzleNumber: 2, name: 'DU-02 Nozzle 2 (Diesel)', fuelType: 'diesel', tankId: 'tank-2' },
+    { id: 'noz-5', dispenserUnit: 'DU-03', nozzleNumber: 1, name: 'DU-03 Nozzle 1 (XP95)', fuelType: 'premium_petrol', tankId: 'tank-3' },
+    { id: 'noz-6', dispenserUnit: 'DU-03', nozzleNumber: 2, name: 'DU-03 Nozzle 2 (Diesel)', fuelType: 'diesel', tankId: 'tank-2' },
+  ]);
+
+  const handleAddRegTank = () => {
+    const nextIdx = customTanks.length + 1;
+    const isDiesel = nextIdx % 2 === 0;
+    const newTank: RegTank = {
+      id: `tank-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: `Tank ${nextIdx} - ${isDiesel ? 'HSD Diesel' : 'MS Petrol'}`,
+      fuelType: isDiesel ? 'diesel' : 'petrol',
+      capacityLiters: 20000,
+      currentVolumeLiters: 10000,
+    };
+    setCustomTanks([...customTanks, newTank]);
+  };
+
+  const handleRemoveRegTank = (tankId: string) => {
+    if (customTanks.length <= 1) {
+      alert('At least 1 underground tank is required.');
+      return;
+    }
+    setCustomTanks(customTanks.filter(t => t.id !== tankId));
+  };
+
+  const handleAddRegNozzle = () => {
+    const nextIdx = customNozzles.length + 1;
+    const duNum = Math.floor(customNozzles.length / 2) + 1;
+    const nozNum = (customNozzles.length % 2) + 1;
+    const defaultTank = customTanks[0]?.id || 'tank-1';
+    const newNozzle: RegNozzle = {
+      id: `noz-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      dispenserUnit: `DU-0${duNum}`,
+      nozzleNumber: nozNum,
+      name: `DU-0${duNum} Nozzle ${nozNum} (${nozNum === 1 ? 'Petrol' : 'Diesel'})`,
+      fuelType: nozNum === 1 ? 'petrol' : 'diesel',
+      tankId: defaultTank,
+    };
+    setCustomNozzles([...customNozzles, newNozzle]);
+  };
+
+  const handleRemoveRegNozzle = (nozzleId: string) => {
+    if (customNozzles.length <= 1) {
+      alert('At least 1 dispensing nozzle is required.');
+      return;
+    }
+    setCustomNozzles(customNozzles.filter(n => n.id !== nozzleId));
+  };
 
   // Mandatory Subscription Plan Selection (Monthly or Yearly)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -80,8 +159,6 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
     setDistrict('Kamrup Metro');
     setState('Assam');
     setPincode('781014');
-    setNozzlesCount(6);
-    setTanksCount(3);
     setOwnerPassword('1234');
     setConfirmPassword('1234');
     setIsPasswordProtected(true);
@@ -126,15 +203,15 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
       roCode: generatedRoCode,
       ownerName: ownerName.trim(),
       ownerPhone: ownerPhone.trim(),
-      ownerEmail: ownerEmail.trim() || 'contact@pumppro.local',
+      ownerEmail: ownerEmail.trim() || 'contact@pumptally.local',
       gstin: gstin.trim() || '18AABCP1337Q1ZT',
       address: address.trim() || 'Highway Service Corridor',
       highwayName: highwayName.trim(),
       district: district.trim() || 'Kamrup',
       state: state.trim() || 'Assam',
       pincode: pincode.trim() || '781001',
-      nozzlesCount: Number(nozzlesCount) || 4,
-      tanksCount: Number(tanksCount) || 2,
+      nozzlesCount: customNozzles.length,
+      tanksCount: customTanks.length,
       registeredDate: new Date().toISOString().split('T')[0],
       planStatus: 'Active',
       isActive: true,
@@ -147,6 +224,16 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
     try {
       // 1. Save registered pump
       storage.registerPump(newPump);
+
+      // 2. Save configured custom tanks and nozzles (Direct Liters & dynamic plus system)
+      storage.saveTanks(
+        customTanks.map((t) => ({
+          ...t,
+          dipReadingCm: Math.round((t.currentVolumeLiters / Math.max(1, t.capacityLiters)) * 260),
+          lastRefillDate: new Date().toISOString().split('T')[0],
+        }))
+      );
+      storage.saveNozzles(customNozzles);
 
       // 2. Update Pump Settings
       const updatedSettings: PumpSettings = {
@@ -168,9 +255,8 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
       storage.setOwnerPassword(isPasswordProtected ? ownerPassword.trim() : '', isPasswordProtected, 0);
       storage.setOwnerUnlocked(true);
 
-      // 4. Process Mandatory Subscription Plan Payment (Monthly or Yearly)
-      const txId = `TXN-PUMPPRO-${Date.now().toString().slice(-8)}`;
-      storage.renewSubscription(billingCycle, paymentMode, txId, [newPump.id]);
+      // 4. Automatically grant 30-Day Free Trial with full features (Auto-locks after 30 days if ₹999/mo unpaid)
+      storage.grantFreeTrial(newPump, 30);
 
       // 5. Mark setup as completed in localStorage
       storage.setSetupCompleted(true);
@@ -492,73 +578,217 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
             </div>
           </div>
 
-          {/* Card 4: Equipment & Shifts */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs">
-                4
+          {/* Card 4: Equipment & Tanks (Dynamic Plus System & Direct Liters) */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-5">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs">
+                  4
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-amber-400" />
+                    <span>Station Configuration (টেংকী আৰু নজল প্লাছ চিষ্টেম)</span>
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    <span className="text-emerald-400 font-bold">পোনপটীয়াকৈ লিটাৰত (Liters) ক্ষমতা</span> • প্লাছ (+) বুটাম টিপি যিকোনো সংখ্যক টেংকী আৰু নজল যোগ কৰক।
+                  </p>
+                </div>
               </div>
-              <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-amber-400" />
-                <span>Station Configuration (পাম্পৰ আন্তঃগাঁথনি)</span>
-              </h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Tanks count */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Underground Tanks
-                  <span className="text-[11px] text-slate-500 font-normal ml-1">(টেংক সংখ্যা)</span>
-                </label>
-                <select
-                  value={tanksCount}
-                  onChange={(e) => setTanksCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500 font-bold cursor-pointer"
+            {/* PART A: UNDERGROUND TANKS (DYNAMIC PLUS SYSTEM & DIRECT LITERS) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Droplet className="w-4 h-4 text-sky-400" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Underground Fuel Tanks ({customTanks.length} টা টেংকী)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddRegTank}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 text-xs font-bold transition active:scale-95 cursor-pointer"
                 >
-                  <option value={2}>2 Underground Tanks (Petrol, Diesel)</option>
-                  <option value={3}>3 Tanks (MS Petrol, HSD Diesel, XP95)</option>
-                  <option value={4}>4 Tanks (MS, HSD 1, HSD 2, Speed/CNG)</option>
-                  <option value={5}>5 Underground Tanks</option>
-                </select>
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>+ Add Tank (টেংকী যোগ কৰক)</span>
+                </button>
               </div>
 
-              {/* Nozzles count */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Dispensing Nozzles
-                  <span className="text-[11px] text-slate-500 font-normal ml-1">(নজল সংখ্যা)</span>
-                </label>
-                <select
-                  value={nozzlesCount}
-                  onChange={(e) => setNozzlesCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500 font-bold cursor-pointer"
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {customTanks.map((tank, idx) => (
+                  <div
+                    key={tank.id}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 space-y-2.5 relative"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[10px] font-bold text-slate-400">Tank #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRegTank(tank.id)}
+                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                        title="Remove tank"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={tank.name}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomTanks(prev => prev.map(t => t.id === tank.id ? { ...t, name: val } : t));
+                      }}
+                      className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700/80 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-orange-500"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400">Fuel Type:</label>
+                        <select
+                          value={tank.fuelType}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setCustomTanks(prev => prev.map(t => t.id === tank.id ? { ...t, fuelType: val } : t));
+                          }}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-[11px] font-bold text-sky-400 focus:outline-none cursor-pointer"
+                        >
+                          <option value="petrol">Petrol (MS)</option>
+                          <option value="diesel">Diesel (HSD)</option>
+                          <option value="premium_petrol">XP95</option>
+                          <option value="cng">CNG</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-emerald-400 font-semibold">Capacity (Liters):</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            value={tank.capacityLiters}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setCustomTanks(prev => prev.map(t => t.id === tank.id ? { ...t, capacityLiters: val } : t));
+                            }}
+                            className="w-full px-2 py-1 bg-slate-900 border border-emerald-500/40 rounded-lg text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-400 pr-5"
+                          />
+                          <span className="absolute right-1.5 top-1 text-[10px] font-bold text-emerald-400">L</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* PART B: DISPENSING NOZZLES (DYNAMIC PLUS SYSTEM) */}
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Fuel className="w-4 h-4 text-orange-400" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Dispensing Nozzles ({customNozzles.length} টা নজল)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddRegNozzle}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-400 text-xs font-bold transition active:scale-95 cursor-pointer"
                 >
-                  <option value={2}>2 Dispensing Nozzles</option>
-                  <option value={4}>4 Nozzles (DU-1 & DU-2)</option>
-                  <option value={6}>6 Dispensing Nozzles</option>
-                  <option value={8}>8 Dispensing Nozzles</option>
-                  <option value={12}>12 Dispensing Nozzles</option>
-                </select>
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>+ Add Nozzle (নজল যোগ কৰক)</span>
+                </button>
               </div>
 
-              {/* Initial Shift */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Initial Working Shift
-                  <span className="text-[11px] text-slate-500 font-normal ml-1">(প্ৰাৰম্ভিক শিফ্ট)</span>
-                </label>
-                <select
-                  value={initialShift}
-                  onChange={(e) => setInitialShift(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500 font-bold cursor-pointer"
-                >
-                  <option value="Shift 1 (Morning)">Shift 1 (Morning)</option>
-                  <option value="Shift 2 (Evening)">Shift 2 (Evening)</option>
-                  <option value="Shift 3 (Night)">Shift 3 (Night)</option>
-                  <option value="General Full Day">General Full Day</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {customNozzles.map((nozzle, idx) => (
+                  <div
+                    key={nozzle.id}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 space-y-2 relative"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        {nozzle.dispenserUnit || 'DU-01'} • #{nozzle.nozzleNumber || idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRegNozzle(nozzle.id)}
+                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                        title="Remove nozzle"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={nozzle.name}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomNozzles(prev => prev.map(n => n.id === nozzle.id ? { ...n, name: val } : n));
+                      }}
+                      className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700/80 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-orange-500"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400">Fuel Type:</label>
+                        <select
+                          value={nozzle.fuelType}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setCustomNozzles(prev => prev.map(n => n.id === nozzle.id ? { ...n, fuelType: val } : n));
+                          }}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-[11px] font-bold text-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="petrol">Petrol (MS)</option>
+                          <option value="diesel">Diesel (HSD)</option>
+                          <option value="premium_petrol">XP95</option>
+                          <option value="cng">CNG</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-slate-400">Connects To:</label>
+                        <select
+                          value={nozzle.tankId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomNozzles(prev => prev.map(n => n.id === nozzle.id ? { ...n, tankId: val } : n));
+                          }}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-[11px] font-bold text-sky-400 focus:outline-none cursor-pointer"
+                        >
+                          {customTanks.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+            </div>
+
+            {/* Shift Picker */}
+            <div className="pt-2 border-t border-slate-800">
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Initial Working Shift <span className="text-[11px] text-slate-500 font-normal ml-1">(প্ৰাৰম্ভিক শিফ্ট)</span>
+              </label>
+              <select
+                value={initialShift}
+                onChange={(e) => setInitialShift(e.target.value)}
+                className="w-full sm:w-64 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-orange-500 font-bold cursor-pointer"
+              >
+                <option value="Shift 1 (Morning)">Shift 1 (Morning)</option>
+                <option value="Shift 2 (Evening)">Shift 2 (Evening)</option>
+                <option value="Shift 3 (Night)">Shift 3 (Night)</option>
+                <option value="General Full Day">General Full Day</option>
+              </select>
             </div>
           </div>
 
@@ -660,91 +890,110 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
             )}
           </div>
 
-          {/* Card 6: Mandatory Subscription Plan & Payment */}
-          <div className="bg-slate-900/90 border-2 border-orange-500/40 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 bg-orange-500/5">
+          {/* Card 6: 30-Day Free Trial & Future Renewal Billing Option */}
+          <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 bg-emerald-500/5">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center text-slate-950 font-black text-xs">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 font-black text-xs">
                   6
                 </div>
                 <div>
                   <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-orange-400 fill-current" />
-                    <span>Choose Plan & Complete Payment (চাবস্ক্ৰিপচন প্লেন আৰু পেমেণ্ট)</span>
+                    <Sparkles className="w-4 h-4 text-emerald-400 fill-current" />
+                    <span>30-Day Free Trial Included (৩০-দিনীয়া বিনামূলীয়া ট্ৰায়েল)</span>
                   </h2>
-                  <p className="text-[11px] text-slate-400">
-                    পেমেণ্ট সম্পন্ন কৰিলেহে ডেশ্ব’ৰ্ডলৈ প্ৰৱেশ কৰিব পাৰিব (Payment required to unlock access)
+                  <p className="text-[11px] text-emerald-300">
+                    আজি কোনো টকা পৰিশোধ কৰিব নালাগে (₹0 Today). ৩০ দিনৰ বাবে সম্পূৰ্ণ এক্সেছ ফ্ৰী!
                   </p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">
-                Required
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/30 animate-pulse">
+                30 Days Free
               </span>
             </div>
 
-            {/* Monthly vs Yearly Selector */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Monthly Option */}
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setBillingCycle('monthly')}
-                className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
-                  billingCycle === 'monthly'
-                    ? 'bg-slate-950 border-orange-500 shadow-md ring-1 ring-orange-500/30'
-                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-75'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase text-slate-300">মাহেকীয়া • Monthly</span>
-                  <div
-                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      billingCycle === 'monthly' ? 'border-orange-500 bg-orange-500' : 'border-slate-600'
-                    }`}
-                  >
-                    {billingCycle === 'monthly' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                  </div>
-                </div>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-xl sm:text-2xl font-black text-white">₹999</span>
-                  <span className="text-[11px] text-slate-400">/ মাহে (30 Days)</span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Flexible month-to-month access. Auto-locks after 30 days if not renewed.
+            {/* Free Trial Banner */}
+            <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black text-white">Full Commercial Pro Access — 30-Day Trial</span>
+                <p className="text-[10px] text-slate-300">
+                  Daily meter readings, stock reconciliation, fuel density audits & credit ledger included at ₹0.
                 </p>
               </div>
+              <div className="text-right shrink-0">
+                <div className="text-base font-black text-emerald-400">₹0 Free</div>
+                <div className="text-[9px] text-slate-400">Valid for 30 Days</div>
+              </div>
+            </div>
 
-              {/* Yearly Option */}
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setBillingCycle('annual')}
-                className={`relative p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
-                  billingCycle === 'annual'
-                    ? 'bg-slate-950 border-sky-500 shadow-md ring-1 ring-sky-500/30'
-                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-75'
-                }`}
-              >
-                <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-sky-500 to-emerald-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full">
-                  ⭐ 2 Months Free (Save 17%)
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase text-sky-400">বাৰ্ষিক • Yearly Best Value</span>
-                  <div
-                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                      billingCycle === 'annual' ? 'border-sky-500 bg-sky-500' : 'border-slate-600'
-                    }`}
-                  >
-                    {billingCycle === 'annual' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+            {/* Renewal Plan selection after 30 days */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-300 block">
+                Renewal Plan After 30 Days (৩০ দিনৰ পাছৰ নবীকৰণ প্লেন):
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Monthly Option */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                    billingCycle === 'monthly'
+                      ? 'bg-slate-950 border-orange-500 shadow-md ring-1 ring-orange-500/30'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-75'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-slate-300">মাহেকীয়া • Monthly</span>
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        billingCycle === 'monthly' ? 'border-orange-500 bg-orange-500' : 'border-slate-600'
+                      }`}
+                    >
+                      {billingCycle === 'monthly' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
                   </div>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-xl font-black text-white">₹999</span>
+                    <span className="text-[11px] text-slate-400">/ মাহে (After Trial)</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Standard monthly plan. Auto-locks after 30 days if not renewed at ₹999/month.
+                  </p>
                 </div>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-xl sm:text-2xl font-black text-white">₹9,990</span>
-                  <span className="text-[11px] text-slate-400">/ বছৰি (365 Days)</span>
+
+                {/* Yearly Option */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setBillingCycle('annual')}
+                  className={`relative p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                    billingCycle === 'annual'
+                      ? 'bg-slate-950 border-sky-500 shadow-md ring-1 ring-sky-500/30'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-75'
+                  }`}
+                >
+                  <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-sky-500 to-emerald-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full">
+                    ⭐ Save 17% (2 Mo Free)
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-sky-400">বাৰ্ষিক • Annual</span>
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        billingCycle === 'annual' ? 'border-sky-500 bg-sky-500' : 'border-slate-600'
+                      }`}
+                    >
+                      {billingCycle === 'annual' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-1">
+                    <span className="text-xl font-black text-white">₹9,990</span>
+                    <span className="text-[11px] text-slate-400">/ বছৰি (After Trial)</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Full 365 days uninterrupted operations after your trial period ends.
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Full 1-year uninterrupted operations without monthly payment hassle.
-                </p>
               </div>
             </div>
 
@@ -824,8 +1073,8 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
               <CheckCircle2 className="w-5 h-5 text-white" />
               <span>
                 {isSubmitting
-                  ? 'পেমেণ্ট পৰীক্ষা আৰু পঞ্জীয়ন কৰা হৈছে... (Processing Payment & Activating...)'
-                  : `₹${billingCycle === 'monthly' ? '999' : '9,990'} পেমেণ্ট সম্পন্ন কৰক আৰু ডেশ্ব’ৰ্ড আনলক কৰক (Complete Payment & Unlock App)`}
+                  ? 'পঞ্জীয়ন কৰা হৈছে আৰু ৩০-দিনীয়া ট্ৰায়েল সক্ৰিয় কৰা হৈছে... (Activating 30-Day Free Trial...)'
+                  : 'পঞ্জীয়ন সম্পূৰ্ণ কৰক আৰু ৩০-দিনীয়া ফ্ৰী ট্ৰায়েল আৰম্ভ কৰক (Complete Registration & Start 30-Day Free Trial - ₹0 Today)'}
               </span>
               <ArrowRight className="w-5 h-5" />
             </button>
@@ -834,7 +1083,7 @@ export const StationRegistrationScreen: React.FC<StationRegistrationScreenProps>
 
         {/* Footer Note */}
         <p className="text-center text-[11px] text-slate-500">
-          PumpPro Petrol Station Management System • Built for 24×7 Highway Operations, Stock Audits & Meter Readings.
+          PumpTally Petrol Station Management System • Built for 24×7 Highway Operations, Stock Audits & Meter Readings.
         </p>
       </div>
     </div>

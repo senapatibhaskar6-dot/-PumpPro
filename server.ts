@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
 const { Pool } = pg;
@@ -68,83 +69,35 @@ async function initDbSchema() {
   try {
     const client = await pool.connect();
     try {
-      console.log('⚡ Initializing Neon PostgreSQL schema for PumpPro...');
+      console.log('⚡ Initializing Neon PostgreSQL schema for PumpTally...');
 
-      // Main persistent key-value store for application collections
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS pumppro_store (
-          key VARCHAR(64) PRIMARY KEY,
-          data JSONB NOT NULL,
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-      `);
-
-      // Audit and synchronization log table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS pumppro_audit_log (
-          id SERIAL PRIMARY KEY,
-          action VARCHAR(64) NOT NULL,
-          details JSONB,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-      `);
-
-      // Index on store key and updated_at
-      await client.query(`
-        CREATE INDEX IF NOT EXISTS idx_pumppro_store_updated ON pumppro_store(updated_at DESC);
-      `);
-
-      // Relational tables for Fuel Stock Management & Tanker Decantations
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS pumppro_tanker_receipts (
-          id VARCHAR(64) PRIMARY KEY,
-          date DATE NOT NULL,
-          time VARCHAR(16),
-          tanker_no VARCHAR(32),
-          invoice_no VARCHAR(64),
-          supplier VARCHAR(64),
-          fuel_type VARCHAR(32),
-          tank_id VARCHAR(64),
-          invoice_qty NUMERIC(12, 2) NOT NULL,
-          actual_qty NUMERIC(12, 2) NOT NULL,
-          shortage_gain NUMERIC(12, 2) DEFAULT 0,
-          density NUMERIC(8, 2),
-          temperature NUMERIC(6, 2),
-          dip_before NUMERIC(8, 2),
-          dip_after NUMERIC(8, 2),
-          driver_name VARCHAR(64),
-          decanted_by VARCHAR(64),
-          remarks TEXT,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS pumppro_fuel_stock_reconciliation (
-          id VARCHAR(64) PRIMARY KEY,
-          date DATE NOT NULL,
-          tank_id VARCHAR(64) NOT NULL,
-          tank_name VARCHAR(128),
-          fuel_type VARCHAR(32) NOT NULL,
-          opening_stock NUMERIC(12, 2) NOT NULL,
-          stock_received NUMERIC(12, 2) DEFAULT 0,
-          total_available NUMERIC(12, 2) NOT NULL,
-          metered_sales NUMERIC(12, 2) NOT NULL,
-          net_sales NUMERIC(12, 2) NOT NULL,
-          expected_closing NUMERIC(12, 2) NOT NULL,
-          actual_closing NUMERIC(12, 2) NOT NULL,
-          actual_dip_cm NUMERIC(8, 2),
-          variance NUMERIC(12, 2) NOT NULL,
-          status VARCHAR(20) NOT NULL,
-          shortage_liters NUMERIC(12, 2) DEFAULT 0,
-          gain_liters NUMERIC(12, 2) DEFAULT 0,
-          financial_impact NUMERIC(12, 2) DEFAULT 0,
-          recorded_by VARCHAR(64),
-          remarks TEXT,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_tanker_date ON pumppro_tanker_receipts(date DESC);
-        CREATE INDEX IF NOT EXISTS idx_stock_recon_date ON pumppro_fuel_stock_reconciliation(date DESC);
-      `);
+      // Load and execute complete schema.sql if exists
+      const schemaPath = path.resolve(__dirname, 'schema.sql');
+      if (fs.existsSync(schemaPath)) {
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+        await client.query(schemaSql);
+        console.log('✅ Neon PostgreSQL full relational tables & store initialized from schema.sql!');
+      } else {
+        // Fallback core table creation
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS pumppro_store (
+            key VARCHAR(64) PRIMARY KEY,
+            data JSONB NOT NULL,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          );
+          CREATE TABLE IF NOT EXISTS pumptally_store (
+            key VARCHAR(64) PRIMARY KEY,
+            data JSONB NOT NULL,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          );
+          CREATE TABLE IF NOT EXISTS pumppro_audit_log (
+            id SERIAL PRIMARY KEY,
+            action VARCHAR(64) NOT NULL,
+            details JSONB,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+          );
+        `);
+      }
 
       // Log successful connection
       await client.query(`

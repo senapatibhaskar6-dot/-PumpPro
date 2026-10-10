@@ -112,7 +112,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             <span>Commercial Petrol Pump SaaS Plan</span>
           </div>
           <h2 className="text-2xl lg:text-3xl font-black text-white tracking-tight">
-            PumpPro Commercial Subscription
+            PumpTally Commercial Subscription
           </h2>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
             প্ৰতিটো পেট্ৰ’ল পাম্পৰ বাবে মাত্ৰ <strong>₹৯৯৯/মাহে</strong> — Multiple পাম্প যোগ হ'লে প্ৰতিটো পাম্পৰ বাবদ ₹৯৯৯ যোগ হ'ব।
@@ -238,7 +238,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-white">PumpPro Multi-Pump License</h3>
+                <h3 className="text-base font-black text-white">PumpTally Multi-Pump License</h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   {pumpCount} STATIONS
                 </span>

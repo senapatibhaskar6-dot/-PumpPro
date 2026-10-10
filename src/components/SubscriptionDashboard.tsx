@@ -229,7 +229,7 @@ export const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({
               <div className="space-y-0.5">
                 <span className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4" />
-                  <span>PumpPro Commercial SaaS Guarantee</span>
+                  <span>PumpTally Commercial SaaS Guarantee</span>
                 </span>
                 <p className="text-xs text-slate-300">
                   Save hours of manual register bookkeeping every single day. Accurate meter sales, automated credit indents, and zero cash discrepancy.

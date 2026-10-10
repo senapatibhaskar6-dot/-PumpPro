@@ -175,7 +175,7 @@ export const Reports: React.FC<ReportsProps> = ({
 
   // Export CSV
   const handleExportCSV = () => {
-    let csv = `PumpPro - Daily Sales & P&L Statement\n`;
+    let csv = `PumpTally - Daily Sales & P&L Statement\n`;
     csv += `Station: ${settings.pumpName} (${settings.dealerBrand})\n`;
     csv += `Date Filter: ${dateFilter === 'custom' ? customDate : dateFilter}\n\n`;
     csv += `Summary Metrics\n`;
@@ -199,7 +199,7 @@ export const Reports: React.FC<ReportsProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `PumpPro_DSR_Report_${getTodayDateString()}.csv`);
+    link.setAttribute('download', `PumpTally_DSR_Report_${getTodayDateString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -20,6 +20,11 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  Plus,
+  Trash2,
+  PlusCircle,
+  X,
+  Gauge,
 } from 'lucide-react';
 import {
   FuelRate,
@@ -49,7 +54,7 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
   onLockOwner,
 }) => {
   const sym = settings.currencySymbol;
-  const [activeSubTab, setActiveSubTab] = useState<'rates' | 'tanks' | 'station' | 'security' | 'backup'>('rates');
+  const [activeSubTab, setActiveSubTab] = useState<'rates' | 'tanks' | 'nozzles' | 'station' | 'security' | 'backup'>('rates');
 
   // Rates State
   const [editableRates, setEditableRates] = useState<FuelRate[]>(rates);
@@ -57,8 +62,35 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
   // Station Profile State
   const [stationForm, setStationForm] = useState<PumpSettings>(settings);
 
-  // Tank Dips State
+  // Tanks State (Direct Liters System)
   const [editableTanks, setEditableTanks] = useState<TankStock[]>(tanks);
+
+  // Nozzles State (Dynamic Plus System)
+  const [editableNozzles, setEditableNozzles] = useState<Nozzle[]>(nozzles);
+
+  // Add Tank Modal State
+  const [showAddTankModal, setShowAddTankModal] = useState<boolean>(false);
+  const [newTankName, setNewTankName] = useState<string>('');
+  const [newTankFuelType, setNewTankFuelType] = useState<string>('petrol');
+  const [newTankCapacity, setNewTankCapacity] = useState<string>('20000');
+  const [newTankStockLiters, setNewTankStockLiters] = useState<string>('12000');
+
+  // Add Nozzle Modal State
+  const [showAddNozzleModal, setShowAddNozzleModal] = useState<boolean>(false);
+  const [newNozzleDU, setNewNozzleDU] = useState<string>('DU-01');
+  const [newNozzleNumber, setNewNozzleNumber] = useState<string>('1');
+  const [newNozzleName, setNewNozzleName] = useState<string>('');
+  const [newNozzleFuelType, setNewNozzleFuelType] = useState<string>('petrol');
+  const [newNozzleTankId, setNewNozzleTankId] = useState<string>(tanks[0]?.id || 'tank-1');
+
+  // Keep state synced with props
+  React.useEffect(() => {
+    setEditableTanks(tanks);
+  }, [tanks]);
+
+  React.useEffect(() => {
+    setEditableNozzles(nozzles);
+  }, [nozzles]);
 
   // Owner Security State
   const [ownerPasswordInput, setOwnerPasswordInput] = useState<string>(() => storage.getOwnerPassword());
@@ -112,12 +144,18 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  // Handle Tanks Dip Update
-  const handleTankChange = (tankId: string, field: 'currentVolumeLiters' | 'dipReadingCm', val: number) => {
+  // Handle Tanks Field Update (Direct Liters & Capacity)
+  const handleTankFieldChange = (tankId: string, field: keyof TankStock, val: any) => {
     setEditableTanks((prev) =>
       prev.map((t) => {
         if (t.id === tankId) {
-          return { ...t, [field]: val };
+          const updated = { ...t, [field]: val };
+          // If volume changed, auto-estimate dipCm for convenience
+          if (field === 'currentVolumeLiters') {
+            const cap = updated.capacityLiters || 20000;
+            updated.dipReadingCm = Math.round((Number(val) / Math.max(1, cap)) * 260);
+          }
+          return updated;
         }
         return t;
       })
@@ -128,8 +166,101 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
     e.preventDefault();
     storage.saveTanks(editableTanks);
     onRefreshData();
-    setFeedback('Underground tank stock levels and dip readings saved successfully!');
+    setFeedback('Underground tank stock levels saved successfully (Direct Liters)!');
     setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleAddTankSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTankName.trim()) {
+      alert('Please enter a name for the underground tank (e.g. Tank 4 - MS Petrol).');
+      return;
+    }
+    const cap = parseFloat(newTankCapacity) || 20000;
+    const vol = parseFloat(newTankStockLiters) || 0;
+    const created = storage.addTank({
+      name: newTankName.trim(),
+      fuelType: newTankFuelType,
+      capacityLiters: cap,
+      currentVolumeLiters: vol,
+      dipReadingCm: Math.round((vol / Math.max(1, cap)) * 260),
+      lastRefillDate: new Date().toISOString().split('T')[0],
+    });
+
+    setEditableTanks(storage.getTanks());
+    setShowAddTankModal(false);
+    setNewTankName('');
+    onRefreshData();
+    setFeedback(`New Underground Tank "${created.name}" added successfully!`);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleDeleteTank = (tankId: string, tankName: string) => {
+    // Check if any nozzles connect to this tank
+    const connectedNozzles = editableNozzles.filter(n => n.tankId === tankId);
+    let confirmMsg = `Are you sure you want to delete "${tankName}"?`;
+    if (connectedNozzles.length > 0) {
+      confirmMsg += `\nWarning: ${connectedNozzles.length} nozzle(s) currently connect to this tank.`;
+    }
+    if (window.confirm(confirmMsg)) {
+      storage.deleteTank(tankId);
+      setEditableTanks(storage.getTanks());
+      onRefreshData();
+      setFeedback(`Tank "${tankName}" deleted.`);
+      setTimeout(() => setFeedback(null), 4000);
+    }
+  };
+
+  // Handle Nozzles Field Update
+  const handleNozzleFieldChange = (nozzleId: string, field: keyof Nozzle, val: any) => {
+    setEditableNozzles((prev) =>
+      prev.map((n) => {
+        if (n.id === nozzleId) {
+          return { ...n, [field]: val };
+        }
+        return n;
+      })
+    );
+  };
+
+  const handleSaveNozzles = (e: React.FormEvent) => {
+    e.preventDefault();
+    storage.saveNozzles(editableNozzles);
+    onRefreshData();
+    setFeedback('All dispensing nozzles configuration updated successfully!');
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleAddNozzleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const du = newNozzleDU.trim() || 'DU-01';
+    const nozNum = parseInt(newNozzleNumber) || 1;
+    const name = newNozzleName.trim() || `${du} Nozzle ${nozNum} (${newNozzleFuelType.toUpperCase()})`;
+
+    const created = storage.addNozzle({
+      dispenserUnit: du,
+      nozzleNumber: nozNum,
+      name,
+      fuelType: newNozzleFuelType,
+      tankId: newNozzleTankId || (editableTanks[0]?.id || 'tank-1'),
+    });
+
+    setEditableNozzles(storage.getNozzles());
+    setShowAddNozzleModal(false);
+    setNewNozzleName('');
+    onRefreshData();
+    setFeedback(`New Dispensing Nozzle "${created.name}" added successfully!`);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleDeleteNozzle = (nozzleId: string, nozzleName: string) => {
+    if (window.confirm(`Are you sure you want to delete dispensing nozzle "${nozzleName}"?`)) {
+      storage.deleteNozzle(nozzleId);
+      setEditableNozzles(storage.getNozzles());
+      onRefreshData();
+      setFeedback(`Nozzle "${nozzleName}" deleted.`);
+      setTimeout(() => setFeedback(null), 4000);
+    }
   };
 
   // Handle Station Profile Save
@@ -171,14 +302,14 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `PumpPro_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `PumpTally_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   };
 
   // Import Backup
   const handleImportBackup = () => {
     if (!backupJson) {
-      alert('Please paste a valid PumpPro JSON backup string.');
+      alert('Please paste a valid PumpTally JSON backup string.');
       return;
     }
     const success = storage.importBackupJSON(backupJson);
@@ -231,13 +362,25 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('tanks')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition ${
+            className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
               activeSubTab === 'tanks'
                 ? 'bg-orange-500 text-white shadow-xs'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Tank Dips
+            <Droplet className="w-3.5 h-3.5" />
+            <span>Tanks (Liters)</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('nozzles')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${
+              activeSubTab === 'nozzles'
+                ? 'bg-orange-500 text-white shadow-xs'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Fuel className="w-3.5 h-3.5" />
+            <span>Nozzles & DUs</span>
           </button>
           <button
             onClick={() => setActiveSubTab('station')}
@@ -375,84 +518,284 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 2: TANK DIPS & UNDERGROUND STORAGE */}
+      {/* SUBTAB 2: UNDERGROUND TANKS - DIRECT LITERS & PLUS SYSTEM */}
       {activeSubTab === 'tanks' && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Droplet className="w-5 h-5 text-sky-400" />
-                <span>Underground Fuel Tanks & Dip Calibration</span>
+                <span>Underground Fuel Tanks (মাটিৰ তলৰ টেংকীসমূহ)</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Record daily dip stick measurement (cm) and calculate physical volume in tanks.
+                <span className="text-emerald-400 font-semibold">পোনপটীয়াকৈ লিটাৰত (Liters) ষ্টক আৰু ক্ষমতা লিখক</span> • কোনো ডিপ ৰড (Dip stick cm) মাপ নিলিখিলেও হ'ব।
               </p>
             </div>
+
+            {/* PLUS BUTTON: Add Underground Tank */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewTankName(`Underground Tank ${editableTanks.length + 1}`);
+                setNewTankCapacity('20000');
+                setNewTankStockLiters('10000');
+                setNewTankFuelType('petrol');
+                setShowAddTankModal(true);
+              }}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md shadow-orange-500/20 active:scale-95 transition cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Add Tank (টেংকী যোগ কৰক)</span>
+            </button>
           </div>
 
-          <form onSubmit={handleSaveTanks} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {editableTanks.map((tank) => (
-                <div
-                  key={tank.id}
-                  className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4.5 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">{tank.name}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-sky-400">
-                      {tank.fuelType}
-                    </span>
+          <form onSubmit={handleSaveTanks} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {editableTanks.map((tank) => {
+                const pct = Math.min(
+                  100,
+                  Math.round((tank.currentVolumeLiters / Math.max(1, tank.capacityLiters)) * 100)
+                );
+                return (
+                  <div
+                    key={tank.id}
+                    className="bg-slate-850/80 border border-slate-700/80 hover:border-slate-600 rounded-2xl p-4.5 space-y-3.5 relative transition shadow-sm"
+                  >
+                    {/* Top Row: Name and Fuel Type + Delete */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={tank.name}
+                          onChange={(e) => handleTankFieldChange(tank.id, 'name', e.target.value)}
+                          className="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-bold text-white w-full focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <select
+                        value={tank.fuelType}
+                        onChange={(e) => handleTankFieldChange(tank.id, 'fuelType', e.target.value)}
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-sky-400 focus:outline-none cursor-pointer"
+                      >
+                        <option value="petrol">Petrol (MS)</option>
+                        <option value="diesel">Diesel (HSD)</option>
+                        <option value="premium_petrol">XP95 / Speed</option>
+                        <option value="cng">CNG</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTank(tank.id, tank.name)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                        title="Delete this underground tank"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Inputs: Direct Liters Stock & Capacity */}
+                    <div className="space-y-2.5">
+                      {/* 1. CURRENT STOCK IN LITERS (NO DIP REQUIRED) */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-emerald-400 flex items-center justify-between">
+                          <span>বৰ্তমান তেল (Liters / লিটাৰত):</span>
+                          <span className="text-[10px] text-slate-400 font-normal">Direct Liters</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            value={tank.currentVolumeLiters}
+                            onChange={(e) =>
+                              handleTankFieldChange(tank.id, 'currentVolumeLiters', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full bg-slate-900 border border-emerald-500/50 rounded-xl px-3 py-2 text-white font-mono font-black text-sm outline-hidden focus:border-emerald-400 pr-10"
+                          />
+                          <span className="absolute right-3 top-2 text-xs font-bold text-emerald-400">L</span>
+                        </div>
+                      </div>
+
+                      {/* 2. TOTAL CAPACITY IN LITERS */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                          <span>মুঠ ক্ষমতা (Capacity Liters):</span>
+                          <span className="text-[10px] text-slate-400 font-normal">ট্যাংক ক্ষমতা</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            value={tank.capacityLiters}
+                            onChange={(e) =>
+                              handleTankFieldChange(tank.id, 'capacityLiters', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-mono font-bold text-xs outline-hidden focus:border-orange-500 pr-10"
+                          />
+                          <span className="absolute right-3 top-1.5 text-xs font-bold text-slate-400">L</span>
+                        </div>
+                      </div>
+
+                      {/* Visual Capacity Bar */}
+                      <div className="pt-1 space-y-1">
+                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              pct < 25 ? 'bg-rose-500' : pct < 45 ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex justify-between">
+                          <span className="font-mono text-slate-300 font-semibold">{pct}% ভৰ্তি (Full)</span>
+                          <span className="text-slate-400 font-mono text-[10px]">
+                            Est. Dip: {tank.dipReadingCm} cm
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  <div className="space-y-2">
+            <div className="pt-2 flex justify-between items-center border-t border-slate-800">
+              <span className="text-xs text-slate-400">
+                মুঠ টেংকী: <strong className="text-white font-mono">{editableTanks.length}</strong> টা
+              </span>
+              <button
+                type="submit"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Tanks Stock (ষ্টক সাঁচি ৰাখক)</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* SUBTAB 3: DISPENSING NOZZLES - DYNAMIC PLUS SYSTEM */}
+      {activeSubTab === 'nozzles' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Fuel className="w-5 h-5 text-orange-400" />
+                <span>Dispensing Nozzles & Units (ডিচপেন্চাৰ নজলসমূহ)</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                <span className="text-orange-400 font-semibold">প্লাছ (+) চিষ্টেমেৰে নজল যোগ কৰক</span> • প্ৰতিটো নজল নিৰ্দিষ্ট টেংকীৰ সৈতে সংযুক্ত থাকে।
+              </p>
+            </div>
+
+            {/* PLUS BUTTON: Add Dispensing Nozzle */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextNozNum = (editableNozzles.length % 2) + 1;
+                const nextDuNum = Math.floor(editableNozzles.length / 2) + 1;
+                setNewNozzleDU(`DU-0${nextDuNum}`);
+                setNewNozzleNumber(String(nextNozNum));
+                setNewNozzleFuelType('petrol');
+                setNewNozzleTankId(editableTanks[0]?.id || 'tank-1');
+                setNewNozzleName(`DU-0${nextDuNum} Nozzle ${nextNozNum} (PETROL)`);
+                setShowAddNozzleModal(true);
+              }}
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md shadow-orange-500/20 active:scale-95 transition cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Add Nozzle (নজল যোগ কৰক)</span>
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveNozzles} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {editableNozzles.map((nozzle) => {
+                const connectedTank = editableTanks.find(t => t.id === nozzle.tankId);
+                return (
+                  <div
+                    key={nozzle.id}
+                    className="bg-slate-850/80 border border-slate-700/80 hover:border-slate-600 rounded-2xl p-4.5 space-y-3 relative transition shadow-sm"
+                  >
+                    {/* Top Row: Unit, Number & Delete */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        {nozzle.dispenserUnit || 'DU-01'} • Nozzle #{nozzle.nozzleNumber}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteNozzle(nozzle.id, nozzle.name)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                        title="Delete this nozzle"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Nozzle Name input */}
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400">
-                        Current Dip Reading (cm)
-                      </label>
+                      <label className="text-[11px] font-semibold text-slate-400">Nozzle Label / Name:</label>
                       <input
-                        type="number"
-                        step="1"
-                        value={tank.dipReadingCm}
-                        onChange={(e) =>
-                          handleTankChange(tank.id, 'dipReadingCm', parseFloat(e.target.value) || 0)
-                        }
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold text-sm outline-hidden"
+                        type="text"
+                        value={nozzle.name}
+                        onChange={(e) => handleNozzleFieldChange(nozzle.id, 'name', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-orange-500"
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400">
-                        Current Volume (Liters)
-                      </label>
-                      <input
-                        type="number"
-                        step="10"
-                        value={tank.currentVolumeLiters}
-                        onChange={(e) =>
-                          handleTankChange(tank.id, 'currentVolumeLiters', parseFloat(e.target.value) || 0)
-                        }
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold text-sm outline-hidden"
-                      />
+                    {/* Fuel Type & Connected Underground Tank */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400">Fuel Type:</label>
+                        <select
+                          value={nozzle.fuelType}
+                          onChange={(e) => handleNozzleFieldChange(nozzle.id, 'fuelType', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-bold text-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="petrol">Petrol (MS)</option>
+                          <option value="diesel">Diesel (HSD)</option>
+                          <option value="premium_petrol">XP95 Premium</option>
+                          <option value="cng">CNG</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400">Connected Tank:</label>
+                        <select
+                          value={nozzle.tankId}
+                          onChange={(e) => handleNozzleFieldChange(nozzle.id, 'tankId', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px] font-bold text-sky-400 focus:outline-none cursor-pointer"
+                        >
+                          {editableTanks.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex justify-between pt-1">
-                      <span>Total Capacity: {tank.capacityLiters.toLocaleString()} L</span>
-                      <span className="font-mono text-sky-400 font-bold">
-                        {Math.round((tank.currentVolumeLiters / tank.capacityLiters) * 100)}% Full
+                    {/* Tank Connection Status Badge */}
+                    <div className="pt-1 text-[10px] text-slate-400 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>সংযুক্ত টেংকী: </span>
+                      <span className="text-slate-300 font-semibold truncate">
+                        {connectedTank?.name || 'Tank Connected'}
                       </span>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex justify-between items-center border-t border-slate-800">
+              <span className="text-xs text-slate-400">
+                মুঠ নজল: <strong className="text-white font-mono">{editableNozzles.length}</strong> টা
+              </span>
               <button
                 type="submit"
-                className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-sky-600/20 active:scale-95 transition cursor-pointer"
+                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-orange-600/20 active:scale-95 transition cursor-pointer"
               >
                 <Save className="w-4 h-4" />
-                <span>Save Tank Readings</span>
+                <span>Save All Nozzles (নজল সংৰক্ষণ কৰক)</span>
               </button>
             </div>
           </form>
@@ -875,7 +1218,7 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
                 rows={6}
                 value={backupJson}
                 onChange={(e) => setBackupJson(e.target.value)}
-                placeholder="Paste exported PumpPro JSON backup content here..."
+                placeholder="Paste exported PumpTally JSON backup content here..."
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-200 outline-hidden"
               />
               <button
@@ -886,6 +1229,224 @@ export const RatesAndSettings: React.FC<RatesAndSettingsProps> = ({
                 <span>Restore JSON Backup</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL: ADD UNDERGROUND TANK */}
+      {showAddTankModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
+                  <Droplet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Add Underground Tank</h3>
+                  <p className="text-[11px] text-slate-400">মাটিৰ তলৰ নতুন টেংকী যোগ কৰক (Liters System)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddTankModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTankSubmit} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-300">Tank Label / Name:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Tank 4 - MS Premium"
+                  value={newTankName}
+                  onChange={(e) => setNewTankName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-300">Fuel Product Type:</label>
+                <select
+                  value={newTankFuelType}
+                  onChange={(e) => setNewTankFuelType(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-sky-500 cursor-pointer"
+                >
+                  <option value="petrol">Petrol (MS)</option>
+                  <option value="diesel">Diesel (HSD)</option>
+                  <option value="premium_petrol">XP95 / Premium Petrol</option>
+                  <option value="cng">CNG (Natural Gas)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Capacity (Liters):</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      step="any"
+                      placeholder="20000"
+                      value={newTankCapacity}
+                      onChange={(e) => setNewTankCapacity(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-sky-500 pr-7"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs text-slate-400">L</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-emerald-400">Opening Stock (Liters):</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      required
+                      step="any"
+                      placeholder="10000"
+                      value={newTankStockLiters}
+                      onChange={(e) => setNewTankStockLiters(e.target.value)}
+                      className="w-full bg-slate-950 border border-emerald-500/50 rounded-xl px-3 py-2 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400 pr-7"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs text-emerald-400">L</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
+                💡 <span className="text-slate-300 font-semibold">Direct Liters Entry:</span> পোনপটীয়াকৈ লিটাৰত লিখক। কোনো ডিপ নিলিখিলেও চিষ্টেমে স্বয়ংক্ৰিয়ভাৱে সকলো হিচাপ কৰিব।
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTankModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/30 transition cursor-pointer"
+                >
+                  + Add Tank
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD DISPENSING NOZZLE */}
+      {showAddNozzleModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400">
+                  <Fuel className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Add Dispensing Nozzle</h3>
+                  <p className="text-[11px] text-slate-400">নতুন ডিচপেন্চাৰ নজল যোগ কৰক (+ Plus System)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddNozzleModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddNozzleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Dispenser Unit (DU):</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. DU-01"
+                    value={newNozzleDU}
+                    onChange={(e) => setNewNozzleDU(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-300">Nozzle Number:</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    placeholder="1"
+                    value={newNozzleNumber}
+                    onChange={(e) => setNewNozzleNumber(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-300">Nozzle Label / Name:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. DU-01 Nozzle 1 (Petrol)"
+                  value={newNozzleName}
+                  onChange={(e) => setNewNozzleName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-orange-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-300">Fuel Product Type:</label>
+                <select
+                  value={newNozzleFuelType}
+                  onChange={(e) => setNewNozzleFuelType(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-orange-500 cursor-pointer"
+                >
+                  <option value="petrol">Petrol (MS)</option>
+                  <option value="diesel">Diesel (HSD)</option>
+                  <option value="premium_petrol">XP95 / Premium Petrol</option>
+                  <option value="cng">CNG (Natural Gas)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-300">Connect to Underground Tank:</label>
+                <select
+                  value={newNozzleTankId}
+                  onChange={(e) => setNewNozzleTankId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-sky-400 focus:outline-none focus:border-sky-500 cursor-pointer"
+                >
+                  {editableTanks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.fuelType.toUpperCase()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddNozzleModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/30 transition cursor-pointer"
+                >
+                  + Add Nozzle
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

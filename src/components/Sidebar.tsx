@@ -201,7 +201,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Section Label */}
           <div className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
             <span>Navigation Modules</span>
-            <span className="text-[10px] text-slate-400 font-mono">PumpPro OS</span>
+            <span className="text-[10px] text-slate-400 font-mono">PumpTally OS</span>
           </div>
 
           {/* Navigation Links */}

@@ -33,6 +33,8 @@ import {
   PumpSettings,
   TankerReceipt,
   DailyFuelStockReconciliation,
+  DailyDensityRecord,
+  DensityQualityStatus,
 } from '../types';
 import { storage, getTodayDateString } from '../services/storage';
 
@@ -57,7 +59,7 @@ export const FuelStockManager: React.FC<FuelStockManagerProps> = ({
   const todayStr = getTodayDateString();
 
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [activeSubTab, setActiveSubTab] = useState<'reconciliation' | 'tankers' | 'analytics'>('reconciliation');
+  const [activeSubTab, setActiveSubTab] = useState<'reconciliation' | 'tankers' | 'density' | 'analytics'>('reconciliation');
   const [selectedTankFilter, setSelectedTankFilter] = useState<string>('all');
 
   // Modals state
@@ -65,9 +67,21 @@ export const FuelStockManager: React.FC<FuelStockManagerProps> = ({
   const [showAddReconModal, setShowAddReconModal] = useState<boolean>(false);
   const [editingTankId, setEditingTankId] = useState<string | null>(null);
 
+  // Density Entry Form State
+  const [densityDate, setDensityDate] = useState<string>(todayStr);
+  const [densityShift, setDensityShift] = useState<string>('Shift 1 (Morning)');
+  const [petrolObserved, setPetrolObserved] = useState<string>('743.0');
+  const [petrolTemp, setPetrolTemp] = useState<string>('28.0');
+  const [dieselObserved, setDieselObserved] = useState<string>('832.5');
+  const [dieselTemp, setDieselTemp] = useState<string>('28.0');
+  const [inspectorName, setInspectorName] = useState<string>('Manager / DSM On Duty');
+  const [densityRemarks, setDensityRemarks] = useState<string>('Hydrometer & ASTM-53B thermometer check at 15°C.');
+  const [densityFeedback, setDensityFeedback] = useState<string | null>(null);
+
   // Data from storage
   const tankerReceipts = storage.getTankerReceipts();
   const allReconciliations = storage.getStockReconciliations();
+  const allDensityRecords = storage.getDailyDensityRecords();
 
   // Filtered by selected date
   const filteredReceipts = useMemo(() => {
@@ -158,6 +172,61 @@ export const FuelStockManager: React.FC<FuelStockManagerProps> = ({
       date: selectedDate,
     });
     onRefreshData();
+  };
+
+  // Official Standards & Live Verification Calculations
+  const petrolStandardRef = settings.petrolStandardDensity || 742.0;
+  const dieselStandardRef = settings.dieselStandardDensity || 832.0;
+
+  const livePetrolObs = parseFloat(petrolObserved) || 0;
+  const liveDieselObs = parseFloat(dieselObserved) || 0;
+  const livePetrolVariance = Number((livePetrolObs - petrolStandardRef).toFixed(1));
+  const liveDieselVariance = Number((liveDieselObs - dieselStandardRef).toFixed(1));
+
+  const getDensityStatus = (variance: number): DensityQualityStatus => {
+    const abs = Math.abs(variance);
+    if (abs <= 1.5) return 'Normal';
+    if (abs <= 3.0) return 'Warning';
+    return 'Adulteration Alert';
+  };
+
+  const livePetrolStatus = getDensityStatus(livePetrolVariance);
+  const liveDieselStatus = getDensityStatus(liveDieselVariance);
+
+  const handleSaveDensityRecord = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!livePetrolObs || !liveDieselObs) {
+      alert('Please enter valid observed density readings for both Petrol and Diesel.');
+      return;
+    }
+
+    storage.addDailyDensityRecord({
+      date: densityDate,
+      shift: densityShift,
+      petrolDensityObserved: livePetrolObs,
+      petrolOfficialDensity: petrolStandardRef,
+      petrolTemperature: parseFloat(petrolTemp) || 28,
+      petrolVariance: livePetrolVariance,
+      petrolStatus: livePetrolStatus,
+      dieselDensityObserved: liveDieselObs,
+      dieselOfficialDensity: dieselStandardRef,
+      dieselTemperature: parseFloat(dieselTemp) || 28,
+      dieselVariance: liveDieselVariance,
+      dieselStatus: liveDieselStatus,
+      recordedBy: inspectorName.trim() || 'Duty DSM',
+      remarks: densityRemarks.trim(),
+    });
+
+    setDensityFeedback('Daily Fuel Density Record verified and saved to database successfully!');
+    setTimeout(() => setDensityFeedback(null), 4000);
+    onRefreshData();
+  };
+
+  const handleDeleteDensityRecord = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this density verification record?')) {
+      storage.deleteDailyDensityRecord(id);
+      onRefreshData();
+    }
   };
 
   return (
@@ -364,6 +433,18 @@ export const FuelStockManager: React.FC<FuelStockManagerProps> = ({
         >
           <TrendingDown className="w-4 h-4" />
           <span>Shortage Analytics & Tolerance</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('density')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSubTab === 'density'
+              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
+              : 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white'
+          }`}
+        >
+          <Droplet className="w-4 h-4 text-sky-400" />
+          <span>Fuel Density Verification (ঘনত্ব পৰীক্ষণ & গুণমান)</span>
         </button>
       </div>
 
@@ -824,7 +905,619 @@ export const FuelStockManager: React.FC<FuelStockManagerProps> = ({
         </div>
       )}
 
-      {/* SUBTAB 3: SHORTAGE ANALYTICS & TOLERANCE RULES */}
+      {/* SUBTAB 4: FUEL DENSITY VERIFICATION & QUALITY AUDIT */}
+      {activeSubTab === 'density' && (
+        <div className="space-y-6">
+          {/* Density Header & KPI Summary */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                    <Droplet className="w-5 h-5" />
+                  </span>
+                  <h3 className="text-lg lg:text-xl font-black text-white tracking-tight">
+                    Fuel Density Verification & Quality Audit (ইন্ধনৰ ঘনত্ব আৰু গুণমান পৰীক্ষা)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+                  Daily ASTM-53B hydrometer & thermo-density test converted to 15°C reference standard.
+                  Instantly verify observed density side-by-side with official oil company standards to detect adulteration or contamination.
+                </p>
+              </div>
+
+              {/* Standards Badge */}
+              <div className="flex items-center gap-2 bg-slate-850 px-3 py-2 rounded-xl border border-slate-800 shrink-0">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <div className="text-[11px]">
+                  <span className="text-slate-400 block">Official Tolerance Norm:</span>
+                  <strong className="text-emerald-400 font-bold">±3.0 kg/m³ (OMC / OIDB Standard)</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Side-by-Side Reference Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+              {/* Petrol Standard Card */}
+              <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20">
+                <div className="flex items-center justify-between text-xs text-orange-400 font-bold">
+                  <span>Petrol (MS) Reference Standard</span>
+                  <Fuel className="w-4 h-4" />
+                </div>
+                <div className="text-2xl font-black text-white mt-1">
+                  {petrolStandardRef.toFixed(1)} <span className="text-xs font-normal text-slate-400">kg/m³ @ 15°C</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Permissible Range: 720.0 - 775.0 kg/m³
+                </span>
+              </div>
+
+              {/* Diesel Standard Card */}
+              <div className="p-4 rounded-2xl bg-sky-500/5 border border-sky-500/20">
+                <div className="flex items-center justify-between text-xs text-sky-400 font-bold">
+                  <span>Diesel (HSD) Reference Standard</span>
+                  <Truck className="w-4 h-4" />
+                </div>
+                <div className="text-2xl font-black text-white mt-1">
+                  {dieselStandardRef.toFixed(1)} <span className="text-xs font-normal text-slate-400">kg/m³ @ 15°C</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Permissible Range: 820.0 - 860.0 kg/m³
+                </span>
+              </div>
+
+              {/* Latest Petrol Test Status */}
+              <div className="p-4 rounded-2xl bg-slate-850 border border-slate-800">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Today's Petrol Observed
+                </span>
+                <div className="text-2xl font-black text-white mt-1">
+                  {allDensityRecords[0] ? allDensityRecords[0].petrolDensityObserved.toFixed(1) : petrolStandardRef.toFixed(1)}{' '}
+                  <span className="text-xs font-normal text-slate-400">kg/m³</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span
+                    className={`inline-block w-2 h-2 rounded-full ${
+                      (allDensityRecords[0]?.petrolStatus || 'Normal') === 'Normal'
+                        ? 'bg-emerald-400'
+                        : allDensityRecords[0]?.petrolStatus === 'Warning'
+                        ? 'bg-amber-400'
+                        : 'bg-rose-500 animate-ping'
+                    }`}
+                  />
+                  <span className="text-[11px] font-bold text-slate-300">
+                    {allDensityRecords[0]?.petrolStatus || 'Normal / Pure'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Latest Diesel Test Status */}
+              <div className="p-4 rounded-2xl bg-slate-850 border border-slate-800">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Today's Diesel Observed
+                </span>
+                <div className="text-2xl font-black text-white mt-1">
+                  {allDensityRecords[0] ? allDensityRecords[0].dieselDensityObserved.toFixed(1) : dieselStandardRef.toFixed(1)}{' '}
+                  <span className="text-xs font-normal text-slate-400">kg/m³</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span
+                    className={`inline-block w-2 h-2 rounded-full ${
+                      (allDensityRecords[0]?.dieselStatus || 'Normal') === 'Normal'
+                        ? 'bg-emerald-400'
+                        : allDensityRecords[0]?.dieselStatus === 'Warning'
+                        ? 'bg-amber-400'
+                        : 'bg-rose-500 animate-ping'
+                    }`}
+                  />
+                  <span className="text-[11px] font-bold text-slate-300">
+                    {allDensityRecords[0]?.dieselStatus || 'Normal / Pure'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* DENSITY ENTRY FORM: Side-by-Side Manual Entry */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400 font-bold">
+                  <Scale className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-white">
+                    Daily Shift Density Entry & Automated Variation Verification
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Enter shift hydrometer test results. System automatically contrasts against reference density.
+                  </p>
+                </div>
+              </div>
+
+              {densityFeedback && (
+                <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{densityFeedback}</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveDensityRecord} className="space-y-6">
+              {/* Shift & Date Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Audit Date (পৰীক্ষাৰ তাৰিখ)
+                  </label>
+                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                    <Calendar className="w-4 h-4 text-orange-400 shrink-0" />
+                    <input
+                      type="date"
+                      value={densityDate}
+                      onChange={(e) => setDensityDate(e.target.value)}
+                      className="bg-transparent text-white font-semibold outline-hidden w-full cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Operating Shift (শ্বিফ্ট)
+                  </label>
+                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                    <Layers className="w-4 h-4 text-sky-400 shrink-0" />
+                    <select
+                      value={densityShift}
+                      onChange={(e) => setDensityShift(e.target.value)}
+                      className="bg-transparent text-white font-semibold outline-hidden w-full cursor-pointer"
+                    >
+                      <option value="Shift 1 (Morning)" className="bg-slate-900">Shift 1 (Morning - 06:00 AM)</option>
+                      <option value="Shift 2 (Evening)" className="bg-slate-900">Shift 2 (Evening - 02:00 PM)</option>
+                      <option value="Shift 3 (Night)" className="bg-slate-900">Shift 3 (Night - 10:00 PM)</option>
+                      <option value="General Full Day" className="bg-slate-900">General Full Day</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Inspector / Duty DSM Name
+                  </label>
+                  <input
+                    type="text"
+                    value={inspectorName}
+                    onChange={(e) => setInspectorName(e.target.value)}
+                    placeholder="e.g. Ramesh Kalita (Shift In-charge)"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-orange-500"
+                  />
+                </div>
+              </div>
+
+              {/* SIDE-BY-SIDE FUEL DENSITY VERIFICATION CARDS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* 1. PETROL (MS) ENTRY & COMPARISON */}
+                <div className="bg-slate-950 border-2 border-orange-500/30 rounded-2xl p-4.5 space-y-4 relative overflow-hidden">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400">
+                        <Fuel className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <span className="text-xs font-extrabold uppercase text-orange-400 tracking-wider">
+                          Petrol (Motor Spirit / MS)
+                        </span>
+                        <h5 className="text-sm font-bold text-white">Daily Density Test @ 15°C</h5>
+                      </div>
+                    </div>
+
+                    {/* Official Standard Badge */}
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-mono">Reference Standard:</span>
+                      <span className="px-2 py-0.5 rounded text-xs font-black bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                        {petrolStandardRef.toFixed(1)} kg/m³
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Manual Input Fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                        Observed Density (kg/m³)*
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={petrolObserved}
+                        onChange={(e) => setPetrolObserved(e.target.value)}
+                        placeholder="e.g. 743.0"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm font-mono font-bold text-white focus:outline-hidden focus:border-orange-500"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Hydrometer @ 15°C</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                        Fuel Temp (°C)
+                      </label>
+                      <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2">
+                        <Thermometer className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={petrolTemp}
+                          onChange={(e) => setPetrolTemp(e.target.value)}
+                          placeholder="28.5"
+                          className="bg-transparent text-sm font-mono font-bold text-white focus:outline-hidden w-full"
+                        />
+                        <span className="text-xs text-slate-400 font-mono">°C</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">ASTM 53B conversion</span>
+                    </div>
+                  </div>
+
+                  {/* AUTOMATED SIDE-BY-SIDE COMPARISON & ADULTERATION HIGHLIGHT */}
+                  <div
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      livePetrolStatus === 'Normal'
+                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                        : livePetrolStatus === 'Warning'
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-rose-500/20 border-rose-500/60 animate-pulse'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                        Automated Purity Verification:
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                          livePetrolStatus === 'Normal'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : livePetrolStatus === 'Warning'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-rose-600 text-white font-extrabold animate-bounce'
+                        }`}
+                      >
+                        {livePetrolStatus === 'Normal' && '✓ 100% PURE / NORMAL'}
+                        {livePetrolStatus === 'Warning' && '⚠ ACCEPTABLE VARIATION'}
+                        {livePetrolStatus === 'Adulteration Alert' && '🚨 ADULTERATION ALERT!'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800/60 text-center">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Entered</span>
+                        <strong className="text-sm font-black text-white font-mono">{livePetrolObs.toFixed(1)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Official Reference</span>
+                        <strong className="text-sm font-black text-orange-400 font-mono">{petrolStandardRef.toFixed(1)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Variation</span>
+                        <strong
+                          className={`text-sm font-black font-mono ${
+                            livePetrolStatus === 'Normal'
+                              ? 'text-emerald-400'
+                              : livePetrolStatus === 'Warning'
+                              ? 'text-amber-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {livePetrolVariance > 0 ? `+${livePetrolVariance}` : livePetrolVariance} kg/m³
+                        </strong>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] mt-2 pt-1 border-t border-slate-800/40 text-slate-300">
+                      {livePetrolStatus === 'Normal' && (
+                        <span>
+                          Strictly within ±1.5 kg/m³. 100% pure petrol quality verified. No staff adulteration detected.
+                        </span>
+                      )}
+                      {livePetrolStatus === 'Warning' && (
+                        <span>
+                          Variation is within permissible Oil Company delivery tolerance (±3.0 kg/m³). Recommended to monitor evening shift.
+                        </span>
+                      )}
+                      {livePetrolStatus === 'Adulteration Alert' && (
+                        <span className="text-rose-300 font-semibold">
+                          CRITICAL: Variation exceeds ±3.0 kg/m³ tolerance! Potential kerosene blending, naphtha solvent addition, or hydrometer malfunction. Immediate physical re-audit recommended.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. DIESEL (HSD) ENTRY & COMPARISON */}
+                <div className="bg-slate-950 border-2 border-sky-500/30 rounded-2xl p-4.5 space-y-4 relative overflow-hidden">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-sky-500/20 text-sky-400">
+                        <Truck className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <span className="text-xs font-extrabold uppercase text-sky-400 tracking-wider">
+                          Diesel (High Speed Diesel / HSD)
+                        </span>
+                        <h5 className="text-sm font-bold text-white">Daily Density Test @ 15°C</h5>
+                      </div>
+                    </div>
+
+                    {/* Official Standard Badge */}
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-mono">Reference Standard:</span>
+                      <span className="px-2 py-0.5 rounded text-xs font-black bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                        {dieselStandardRef.toFixed(1)} kg/m³
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Manual Input Fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                        Observed Density (kg/m³)*
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={dieselObserved}
+                        onChange={(e) => setDieselObserved(e.target.value)}
+                        placeholder="e.g. 832.5"
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm font-mono font-bold text-white focus:outline-hidden focus:border-sky-500"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Hydrometer @ 15°C</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                        Fuel Temp (°C)
+                      </label>
+                      <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2">
+                        <Thermometer className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={dieselTemp}
+                          onChange={(e) => setDieselTemp(e.target.value)}
+                          placeholder="28.5"
+                          className="bg-transparent text-sm font-mono font-bold text-white focus:outline-hidden w-full"
+                        />
+                        <span className="text-xs text-slate-400 font-mono">°C</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">ASTM 53B conversion</span>
+                    </div>
+                  </div>
+
+                  {/* AUTOMATED SIDE-BY-SIDE COMPARISON & ADULTERATION HIGHLIGHT */}
+                  <div
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      liveDieselStatus === 'Normal'
+                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                        : liveDieselStatus === 'Warning'
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-rose-500/20 border-rose-500/60 animate-pulse'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                        Automated Purity Verification:
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                          liveDieselStatus === 'Normal'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : liveDieselStatus === 'Warning'
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-rose-600 text-white font-extrabold animate-bounce'
+                        }`}
+                      >
+                        {liveDieselStatus === 'Normal' && '✓ 100% PURE / NORMAL'}
+                        {liveDieselStatus === 'Warning' && '⚠ ACCEPTABLE VARIATION'}
+                        {liveDieselStatus === 'Adulteration Alert' && '🚨 ADULTERATION ALERT!'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800/60 text-center">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Entered</span>
+                        <strong className="text-sm font-black text-white font-mono">{liveDieselObs.toFixed(1)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Official Reference</span>
+                        <strong className="text-sm font-black text-sky-400 font-mono">{dieselStandardRef.toFixed(1)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Variation</span>
+                        <strong
+                          className={`text-sm font-black font-mono ${
+                            liveDieselStatus === 'Normal'
+                              ? 'text-emerald-400'
+                              : liveDieselStatus === 'Warning'
+                              ? 'text-amber-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {liveDieselVariance > 0 ? `+${liveDieselVariance}` : liveDieselVariance} kg/m³
+                        </strong>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] mt-2 pt-1 border-t border-slate-800/40 text-slate-300">
+                      {liveDieselStatus === 'Normal' && (
+                        <span>
+                          Strictly within ±1.5 kg/m³. 100% pure high-speed diesel quality verified. Engine friendly.
+                        </span>
+                      )}
+                      {liveDieselStatus === 'Warning' && (
+                        <span>
+                          Variation is within permissible Oil Company delivery tolerance (±3.0 kg/m³). Verified within acceptable limits.
+                        </span>
+                      )}
+                      {liveDieselStatus === 'Adulteration Alert' && (
+                        <span className="text-rose-300 font-semibold">
+                          CRITICAL: Variation exceeds ±3.0 kg/m³ tolerance! Risk of heavy oil residue, water ingress in underground tank, or unauthorized mixing. Check immediately.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks & Submission */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-300">
+                  Verification Remarks / Notes (মন্তব্য)
+                </label>
+                <input
+                  type="text"
+                  value={densityRemarks}
+                  onChange={(e) => setDensityRemarks(e.target.value)}
+                  placeholder="e.g. Morning hydrometer test conducted in presence of duty manager. Hydrometer calibrated."
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-orange-500"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs shadow-lg shadow-orange-500/20 active:scale-95 transition cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Verify & Save Density Record (ঘনত্ব পৰীক্ষা জমা কৰক)</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* HISTORICAL DENSITY AUDIT LOG TABLE */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+              <div>
+                <h4 className="text-base font-bold text-white flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-orange-400" />
+                  <span>Historical Fuel Density Audit Log (পূৰ্ববৰ্তী ঘনত্ব ৰেকৰ্ড)</span>
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Permanent quality ledger for Weights & Measures, Oil Marketing Company audits and station owners.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-slate-400">
+                {allDensityRecords.length} Audited Records
+              </span>
+            </div>
+
+            {allDensityRecords.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                No density records logged yet. Use the form above to record your shift density tests.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-3">Date & Shift</th>
+                      <th className="py-3 px-3">Petrol (MS) Density</th>
+                      <th className="py-3 px-3">Petrol Variance</th>
+                      <th className="py-3 px-3">Diesel (HSD) Density</th>
+                      <th className="py-3 px-3">Diesel Variance</th>
+                      <th className="py-3 px-3">Auditor</th>
+                      <th className="py-3 px-3">Remarks</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {allDensityRecords.map((rec) => (
+                      <tr key={rec.id} className="hover:bg-slate-850/60 transition">
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="font-bold text-white">{rec.date}</div>
+                          <div className="text-[10px] text-slate-400">{rec.shift}</div>
+                        </td>
+
+                        {/* Petrol Column */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="font-bold text-orange-300 font-mono">
+                            {rec.petrolDensityObserved.toFixed(1)} kg/m³
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Std: {rec.petrolOfficialDensity.toFixed(1)} | {rec.petrolTemperature || 28}°C
+                          </div>
+                        </td>
+
+                        {/* Petrol Variance */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                              rec.petrolStatus === 'Normal'
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                : rec.petrolStatus === 'Warning'
+                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-black'
+                            }`}
+                          >
+                            <span>{rec.petrolVariance > 0 ? `+${rec.petrolVariance}` : rec.petrolVariance} kg/m³</span>
+                            <span className="text-[9px]">({rec.petrolStatus})</span>
+                          </span>
+                        </td>
+
+                        {/* Diesel Column */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="font-bold text-sky-300 font-mono">
+                            {rec.dieselDensityObserved.toFixed(1)} kg/m³
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Std: {rec.dieselOfficialDensity.toFixed(1)} | {rec.dieselTemperature || 28}°C
+                          </div>
+                        </td>
+
+                        {/* Diesel Variance */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
+                              rec.dieselStatus === 'Normal'
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                                : rec.dieselStatus === 'Warning'
+                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-black'
+                            }`}
+                          >
+                            <span>{rec.dieselVariance > 0 ? `+${rec.dieselVariance}` : rec.dieselVariance} kg/m³</span>
+                            <span className="text-[9px]">({rec.dieselStatus})</span>
+                          </span>
+                        </td>
+
+                        {/* Auditor */}
+                        <td className="py-3 px-3 text-slate-300 whitespace-nowrap">
+                          {rec.recordedBy}
+                        </td>
+
+                        {/* Remarks */}
+                        <td className="py-3 px-3 text-slate-400 text-[11px] max-w-xs truncate" title={rec.remarks}>
+                          {rec.remarks || '—'}
+                        </td>
+
+                        {/* Delete action */}
+                        <td className="py-3 px-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => handleDeleteDensityRecord(rec.id)}
+                            className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                            title="Delete this record"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {activeSubTab === 'analytics' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1494,37 +2187,56 @@ const DayEndReconciliationModal: React.FC<DayEndReconciliationModalProps> = ({
             </span>
           </div>
 
-          {/* 6. Physical Dip & Actual Closing Stock Inputs */}
+          {/* 6. Physical Closing Stock (Direct Liters & Optional Dip) */}
           <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/30 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-bold text-indigo-300 text-xs">
-                6. Measured Physical Closing Stock (Day-End Tank Dip)
+                6. Measured Physical Closing Stock (বাস্তৱিক ক্লজিং ষ্টক - লিটাৰত)
               </span>
-              <span className="text-[10px] text-slate-400">Physical Rod Reading</span>
+              <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                Direct Liters Entry
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3">
+              {/* PRIMARY: DIRECT LITERS ENTRY */}
               <div className="space-y-1">
-                <label className="font-bold text-slate-300">Physical Dip Stick (cm)</label>
+                <label className="font-bold text-white text-xs flex items-center justify-between">
+                  <span>Actual Closing Stock (Liters / লিটাৰত ষ্টক):</span>
+                  <span className="text-[10px] text-emerald-400 font-normal">সরাসৰি লিটাৰত লিখক (Required)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={actualClosingLiters}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setActualClosingLiters(val);
+                      // Auto-estimate dip stick cm so user never has to enter dip
+                      const estDip = Math.round((val / Math.max(1, selectedTank.capacityLiters)) * 260);
+                      setDipCm(estDip);
+                    }}
+                    placeholder="Enter physical volume in Liters"
+                    className="w-full bg-slate-900 border border-emerald-500/50 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-emerald-300 font-mono font-black text-base outline-hidden pr-10"
+                  />
+                  <span className="absolute right-3.5 top-2.5 font-bold text-emerald-400">L</span>
+                </div>
+              </div>
+
+              {/* SECONDARY: OPTIONAL DIP STICK READING */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-400 text-[11px] flex items-center justify-between">
+                  <span>Physical Dip Stick cm (ঐচ্ছিক / Optional):</span>
+                  <span className="text-[10px] text-slate-500">Auto-calculated if left as is</span>
+                </label>
                 <input
                   type="number"
                   step="0.1"
-                  required
                   value={dipCm}
                   onChange={e => setDipCm(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white font-mono font-bold outline-hidden"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-300">Actual Closing Stock (Liters)</label>
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  value={actualClosingLiters}
-                  onChange={e => setActualClosingLiters(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-indigo-300 font-mono font-black text-sm outline-hidden"
+                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-1.5 text-slate-300 font-mono text-xs outline-hidden"
                 />
               </div>
             </div>

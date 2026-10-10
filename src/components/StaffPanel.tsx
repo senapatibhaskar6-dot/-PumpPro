@@ -16,6 +16,8 @@ import {
   TrendingDown,
   TrendingUp,
   CheckCircle2,
+  Thermometer,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   PumpSettings,
@@ -116,6 +118,56 @@ export const StaffPanel: React.FC<StaffPanelProps> = ({
   const [lubeQuantity, setLubeQuantity] = useState<number>(1);
   const [lubePaymentMode, setLubePaymentMode] = useState<'Cash' | 'UPI' | 'Card' | 'Credit'>('Cash');
   const [lubeSuccess, setLubeSuccess] = useState<boolean>(false);
+
+  // Shift Fuel Density Verification State
+  const petrolStandardRef = settings.petrolStandardDensity || 742.0;
+  const dieselStandardRef = settings.dieselStandardDensity || 832.0;
+  const [shiftPetrolObserved, setShiftPetrolObserved] = useState<string>('743.0');
+  const [shiftDieselObserved, setShiftDieselObserved] = useState<string>('832.5');
+  const [shiftDensityTemp, setShiftDensityTemp] = useState<string>('28.0');
+  const [shiftAuditor, setShiftAuditor] = useState<string>('Duty Staff (DSM)');
+  const [densitySavedMsg, setDensitySavedMsg] = useState<string | null>(null);
+
+  const shiftPetrolVal = parseFloat(shiftPetrolObserved) || 0;
+  const shiftDieselVal = parseFloat(shiftDieselObserved) || 0;
+  const shiftPetrolVar = Number((shiftPetrolVal - petrolStandardRef).toFixed(1));
+  const shiftDieselVar = Number((shiftDieselVal - dieselStandardRef).toFixed(1));
+
+  const getShiftDensityStatus = (variance: number) => {
+    const abs = Math.abs(variance);
+    if (abs <= 1.5) return 'Normal';
+    if (abs <= 3.0) return 'Warning';
+    return 'Adulteration Alert';
+  };
+
+  const shiftPetrolStatus = getShiftDensityStatus(shiftPetrolVar);
+  const shiftDieselStatus = getShiftDensityStatus(shiftDieselVar);
+
+  const handleSaveShiftDensity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shiftPetrolVal || !shiftDieselVal) return;
+
+    storage.addDailyDensityRecord({
+      date: todayStr,
+      shift: activeShift,
+      petrolDensityObserved: shiftPetrolVal,
+      petrolOfficialDensity: petrolStandardRef,
+      petrolTemperature: parseFloat(shiftDensityTemp) || 28,
+      petrolVariance: shiftPetrolVar,
+      petrolStatus: shiftPetrolStatus,
+      dieselDensityObserved: shiftDieselVal,
+      dieselOfficialDensity: dieselStandardRef,
+      dieselTemperature: parseFloat(shiftDensityTemp) || 28,
+      dieselVariance: shiftDieselVar,
+      dieselStatus: shiftDieselStatus,
+      recordedBy: shiftAuditor.trim() || 'Duty DSM',
+      remarks: `Shift density recorded during ${activeShift}.`,
+    });
+
+    setDensitySavedMsg('Shift Density Record verified & saved!');
+    setTimeout(() => setDensitySavedMsg(null), 3000);
+    onRefreshData();
+  };
 
   // Auto-calculated Stock Reconciliation for the selected tank
   const reconData = useMemo(() => {
@@ -616,39 +668,36 @@ export const StaffPanel: React.FC<StaffPanelProps> = ({
                 <div className="bg-slate-950/70 border-2 border-orange-500/40 rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between bg-orange-500/5">
                   <div className="flex items-center justify-between text-[11px] sm:text-xs text-orange-400 font-bold mb-1">
                     <span className="flex items-center gap-1 sm:gap-1.5 truncate">
-                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-orange-500 flex items-center justify-center text-[9px] sm:text-[10px] text-slate-950 font-bold shrink-0">6</span>
-                      <span className="truncate">Actual Dip Stock</span>
+                      <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-500 flex items-center justify-center text-[9px] sm:text-[10px] text-slate-950 font-bold shrink-0">6</span>
+                      <span className="truncate">Actual Stock (লিটাৰত)</span>
                     </span>
-                    <span className="text-[9px] bg-orange-500/20 px-1 py-0.2 rounded text-orange-400 shrink-0">Dip Rod</span>
+                    <span className="text-[9px] bg-emerald-500/20 px-1 py-0.2 rounded text-emerald-400 shrink-0 font-bold">Liters</span>
                   </div>
                   <div className="mt-0.5 flex items-baseline justify-between">
-                    <span className="text-lg sm:text-2xl font-black text-white font-mono truncate">
+                    <span className="text-lg sm:text-2xl font-black text-emerald-400 font-mono truncate">
                       {reconData.actualClosingLiters.toLocaleString()}
                     </span>
                     <span className="text-[10px] sm:text-xs text-slate-400 font-semibold ml-1">L</span>
                   </div>
-                  <div className="mt-1.5 pt-1.5 border-t border-slate-800 grid grid-cols-2 gap-1">
+                  <div className="mt-1.5 pt-1.5 border-t border-slate-800 space-y-1">
                     <input
                       type="number"
-                      placeholder="Dip cm"
-                      value={actualDipCm}
+                      placeholder="Enter Stock in Liters (লিটাৰ)"
+                      value={actualClosingLiters}
                       onChange={(e) => {
-                        setActualDipCm(e.target.value);
+                        setActualClosingLiters(e.target.value);
                         if (e.target.value) {
-                          const cm = parseFloat(e.target.value);
-                          const approxLiters = Math.round(activeTank.capacityLiters * (cm / 260));
-                          setActualClosingLiters(String(approxLiters));
+                          const ltr = parseFloat(e.target.value);
+                          const estCm = Math.round((ltr / Math.max(1, activeTank.capacityLiters)) * 260);
+                          setActualDipCm(String(estCm));
                         }
                       }}
-                      className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] sm:text-xs text-white focus:outline-none focus:border-orange-500"
+                      className="w-full bg-slate-900 border border-emerald-500/50 rounded px-2 py-1 text-xs text-emerald-300 focus:outline-none focus:border-emerald-400 font-bold font-mono"
                     />
-                    <input
-                      type="number"
-                      placeholder="Liters"
-                      value={actualClosingLiters}
-                      onChange={(e) => setActualClosingLiters(e.target.value)}
-                      className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] sm:text-xs text-white focus:outline-none focus:border-orange-500 font-bold"
-                    />
+                    <div className="text-[9px] text-slate-500 flex justify-between">
+                      <span>Direct Liters entry</span>
+                      <span>Est. Dip: {actualDipCm || activeTank.dipReadingCm} cm</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -745,6 +794,157 @@ export const StaffPanel: React.FC<StaffPanelProps> = ({
               </div>
             </div>
           )}
+
+          {/* DAILY SHIFT FUEL DENSITY VERIFICATION CARD (STAFF ENTRY) */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                  <Droplet className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">
+                    Daily Shift Fuel Density Test (দৈনিক ইন্ধনৰ ঘনত্ব পৰীক্ষা)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Verify Petrol & Diesel hydrometer density @ 15°C side-by-side with official standard.
+                  </p>
+                </div>
+              </div>
+
+              {densitySavedMsg && (
+                <div className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{densitySavedMsg}</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveShiftDensity} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Petrol Density */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+                      <Fuel className="w-3.5 h-3.5" />
+                      <span>Petrol (MS) Density</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                      Official Std: <strong className="text-orange-300">{petrolStandardRef.toFixed(1)}</strong> kg/m³
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Observed (kg/m³):</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={shiftPetrolObserved}
+                        onChange={(e) => setShiftPetrolObserved(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:outline-hidden focus:border-orange-500"
+                        placeholder="743.0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Temp (°C):</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={shiftDensityTemp}
+                        onChange={(e) => setShiftDensityTemp(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-hidden"
+                        placeholder="28.0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Variation Highlight Badge */}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-850 text-[11px]">
+                    <span className="text-slate-400">
+                      Variation: <strong className={shiftPetrolStatus === 'Normal' ? 'text-emerald-400' : shiftPetrolStatus === 'Warning' ? 'text-amber-400' : 'text-rose-400'}>
+                        {shiftPetrolVar > 0 ? `+${shiftPetrolVar}` : shiftPetrolVar} kg/m³
+                      </strong>
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                      shiftPetrolStatus === 'Normal'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : shiftPetrolStatus === 'Warning'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'bg-rose-500 text-white animate-pulse'
+                    }`}>
+                      {shiftPetrolStatus === 'Normal' ? '✓ PURE' : shiftPetrolStatus === 'Warning' ? '⚠ TOLERANCE' : '🚨 ADULTERATION ALERT'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Diesel Density */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5" />
+                      <span>Diesel (HSD) Density</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                      Official Std: <strong className="text-sky-300">{dieselStandardRef.toFixed(1)}</strong> kg/m³
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Observed (kg/m³):</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={shiftDieselObserved}
+                        onChange={(e) => setShiftDieselObserved(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:outline-hidden focus:border-sky-500"
+                        placeholder="832.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Duty Staff:</label>
+                      <input
+                        type="text"
+                        value={shiftAuditor}
+                        onChange={(e) => setShiftAuditor(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-hidden"
+                        placeholder="DSM Name"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Variation Highlight Badge */}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-850 text-[11px]">
+                    <span className="text-slate-400">
+                      Variation: <strong className={shiftDieselStatus === 'Normal' ? 'text-emerald-400' : shiftDieselStatus === 'Warning' ? 'text-amber-400' : 'text-rose-400'}>
+                        {shiftDieselVar > 0 ? `+${shiftDieselVar}` : shiftDieselVar} kg/m³
+                      </strong>
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                      shiftDieselStatus === 'Normal'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : shiftDieselStatus === 'Warning'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'bg-rose-500 text-white animate-pulse'
+                    }`}>
+                      {shiftDieselStatus === 'Normal' ? '✓ PURE' : shiftDieselStatus === 'Warning' ? '⚠ TOLERANCE' : '🚨 ADULTERATION ALERT'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Save Shift Density Test (ঘনত্ব পৰীক্ষা সংৰক্ষণ)</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

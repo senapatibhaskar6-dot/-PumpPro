@@ -178,7 +178,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           {/* Footer note */}
           <div className="text-center text-[8px] text-slate-500 pt-2">
             *** Thank you for fueling with us! Safe Journey! ***
-            <div className="font-mono text-[7px] mt-0.5 text-slate-400">Powered by PumpPro OS</div>
+            <div className="font-mono text-[7px] mt-0.5 text-slate-400">Powered by PumpTally OS</div>
           </div>
         </div>
 

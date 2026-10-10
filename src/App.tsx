@@ -168,7 +168,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-orange-500 selection:text-white max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-white text-slate-800 flex flex-col font-sans selection:bg-orange-500 selection:text-white max-w-full overflow-x-hidden">
       {/* Top Navbar */}
       <Navbar
         settings={settings}
@@ -193,6 +193,7 @@ export default function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         activeRole={activeRole}
         onToggleRole={handleRoleChange}
+        onLockOwner={handleLockOwner}
       />
 
       {/* Main Workspace Layout */}
@@ -207,10 +208,11 @@ export default function App() {
           onCloseMobile={() => setIsMobileMenuOpen(false)}
           activeRole={activeRole}
           onToggleRole={handleRoleChange}
+          onLockOwner={handleLockOwner}
         />
 
         {/* Content Body Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 sm:px-6 sm:py-5 lg:px-8 lg:py-6 pb-28 lg:pb-8">
+        <main className="flex-1 bg-white overflow-y-auto overflow-x-hidden px-2.5 py-3 sm:px-6 sm:py-5 lg:px-8 lg:py-6 pb-28 lg:pb-8">
           <div className="max-w-7xl mx-auto">
             {currentTab === 'dashboard' && (
               activeRole === 'staff' ? (
@@ -429,6 +431,20 @@ export default function App() {
       {showNeonModal && (
         <NeonDatabaseModal onClose={() => setShowNeonModal(false)} />
       )}
+
+      {/* Owner & Management Password Protection Modal */}
+      <OwnerPasswordModal
+        isOpen={showOwnerPasswordModal}
+        settings={settings}
+        onClose={() => setShowOwnerPasswordModal(false)}
+        onSuccess={() => {
+          setIsOwnerUnlocked(true);
+          setActiveRole('owner');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('pumppro_active_role', 'owner');
+          }
+        }}
+      />
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}
       <MobileBottomNav

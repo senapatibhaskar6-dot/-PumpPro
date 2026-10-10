@@ -17,6 +17,7 @@ import {
   SubscriptionInvoice,
   TankerReceipt,
   DailyFuelStockReconciliation,
+  DailyDensityRecord,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -37,6 +38,7 @@ const STORAGE_KEYS = {
   REGISTERED_PUMPS: 'pumppro_registered_pumps',
   TANKER_RECEIPTS: 'pumppro_tanker_receipts',
   STOCK_RECONCILIATIONS: 'pumppro_stock_reconciliations',
+  DAILY_DENSITY_RECORDS: 'pumptally_daily_density_records',
   SETUP_COMPLETED: 'pumppro_setup_completed',
   OWNER_SECURITY: 'pumppro_owner_security',
   OWNER_SESSION_UNLOCKED: 'pumppro_owner_session_unlocked',
@@ -55,6 +57,9 @@ export const DEFAULT_SETTINGS: PumpSettings = {
   ownerPassword: '1234',
   isOwnerProtected: true,
   autoLockMinutes: 0,
+  petrolStandardDensity: 742.0, // Official reference standard @ 15°C
+  dieselStandardDensity: 832.0, // Official reference standard @ 15°C
+  densityTolerance: 3.0, // Permissible tolerance in kg/m³
 };
 
 // Default Fuel Rates
@@ -614,8 +619,8 @@ export const DEFAULT_EXPENSES: ExpenseRecord[] = [
 
 // Default SaaS Subscription Plan (Monthly ₹999 per pump)
 export const DEFAULT_SUBSCRIPTION: PumpSubscription = {
-  id: 'sub-pumppro-001',
-  planName: 'PumpPro Multi-Pump Commercial Pro',
+  id: 'sub-pumptally-001',
+  planName: 'PumpTally Multi-Pump Commercial Pro',
   pricePerPumpMonthly: 999,
   pricePerPumpAnnual: 9990,
   activePumpsCount: 2, // 2 default stations
@@ -640,10 +645,10 @@ export const DEFAULT_SUBSCRIPTION: PumpSubscription = {
   invoices: [
     {
       id: 'inv-sub-1001',
-      invoiceNumber: 'PUMPPRO-INV-2026-1001',
+      invoiceNumber: 'PUMPTALLY-INV-2026-1001',
       date: '2026-10-01',
       amount: 1998,
-      planName: 'PumpPro Commercial Pro (2 Stations @ ₹999/pump/mo)',
+      planName: 'PumpTally Commercial Pro (2 Stations @ ₹999/pump/mo)',
       billingPeriod: '01 Oct 2026 - 03 Nov 2026',
       paymentMode: 'UPI / QR',
       transactionId: 'UPI-RAZOR-9948210344',
@@ -802,6 +807,46 @@ export const DEFAULT_STOCK_RECONCILIATIONS: DailyFuelStockReconciliation[] = [
     recordedBy: 'Bhaskar Senapati (Manager)',
     remarks: '10 Liters minor handling shortage recorded. Within standard oil company tolerance.',
     timestamp: Date.now() - 3600000 * 2,
+  },
+];
+
+// Default Daily Density Records for Quality & Adulteration Audits
+export const DEFAULT_DAILY_DENSITY_RECORDS: DailyDensityRecord[] = [
+  {
+    id: 'dens-rec-01',
+    date: getTodayDateString(),
+    shift: 'Shift 1 (Morning)',
+    petrolDensityObserved: 743.2,
+    petrolOfficialDensity: 742.0,
+    petrolTemperature: 28.5,
+    petrolVariance: 1.2,
+    petrolStatus: 'Normal',
+    dieselDensityObserved: 832.8,
+    dieselOfficialDensity: 832.0,
+    dieselTemperature: 29.0,
+    dieselVariance: 0.8,
+    dieselStatus: 'Normal',
+    recordedBy: 'Bhaskar Senapati (Manager)',
+    remarks: 'Tested via hydrometer & thermo-density conversion chart at 15°C. Density strictly within 100% pure range.',
+    timestamp: Date.now() - 3600000 * 3,
+  },
+  {
+    id: 'dens-rec-02',
+    date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+    shift: 'Shift 2 (Evening)',
+    petrolDensityObserved: 741.5,
+    petrolOfficialDensity: 742.0,
+    petrolTemperature: 30.0,
+    petrolVariance: -0.5,
+    petrolStatus: 'Normal',
+    dieselDensityObserved: 833.6,
+    dieselOfficialDensity: 832.0,
+    dieselTemperature: 30.2,
+    dieselVariance: 1.6,
+    dieselStatus: 'Warning',
+    recordedBy: 'Rahul Das (Senior DSM)',
+    remarks: 'Evening test after TT decantation. Diesel variation ±1.6 within OMC permissible limit (±3.0).',
+    timestamp: Date.now() - 86400000 - 3600000 * 2,
   },
 ];
 
@@ -964,6 +1009,7 @@ class StorageService {
         [STORAGE_KEYS.REGISTERED_PUMPS]: this.getRegisteredPumps(),
         [STORAGE_KEYS.TANKER_RECEIPTS]: this.getTankerReceipts(),
         [STORAGE_KEYS.STOCK_RECONCILIATIONS]: this.getStockReconciliations(),
+        [STORAGE_KEYS.DAILY_DENSITY_RECORDS]: this.getDailyDensityRecords(),
       };
 
       const res = await fetch('/api/db/bulk-save', {
@@ -1083,6 +1129,56 @@ class StorageService {
     this.setItem(STORAGE_KEYS.TANKS, tanks);
   }
 
+  addTank(tank: Omit<TankStock, 'id'> & { id?: string }): TankStock {
+    const tanks = this.getTanks();
+    const capacity = Number(tank.capacityLiters) || 20000;
+    const currentVol = Number(tank.currentVolumeLiters) || 0;
+    const estimatedDip = tank.dipReadingCm !== undefined && tank.dipReadingCm > 0
+      ? tank.dipReadingCm
+      : Math.round((currentVol / Math.max(1, capacity)) * 260);
+
+    const newTank: TankStock = {
+      id: tank.id || `tank-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: tank.name || `Underground Tank ${tanks.length + 1}`,
+      fuelType: tank.fuelType || 'petrol',
+      capacityLiters: capacity,
+      currentVolumeLiters: currentVol,
+      dipReadingCm: estimatedDip,
+      lastRefillDate: tank.lastRefillDate || new Date().toISOString().split('T')[0],
+    };
+
+    tanks.push(newTank);
+    this.saveTanks(tanks);
+    return newTank;
+  }
+
+  updateTank(updatedTank: TankStock): void {
+    const tanks = this.getTanks();
+    const updated = tanks.map(t => (t.id === updatedTank.id ? updatedTank : t));
+    this.saveTanks(updated);
+  }
+
+  deleteTank(tankId: string): boolean {
+    const tanks = this.getTanks();
+    const filtered = tanks.filter(t => t.id !== tankId);
+    this.saveTanks(filtered);
+    return true;
+  }
+
+  updateTankStockLiters(tankId: string, newVolumeLiters: number, dipCm?: number): void {
+    const tanks = this.getTanks();
+    const updated = tanks.map(t => {
+      if (t.id === tankId) {
+        const estDip = dipCm !== undefined && dipCm > 0
+          ? dipCm
+          : Math.round((newVolumeLiters / Math.max(1, t.capacityLiters)) * 260);
+        return { ...t, currentVolumeLiters: newVolumeLiters, dipReadingCm: estDip };
+      }
+      return t;
+    });
+    this.saveTanks(updated);
+  }
+
   updateTankDip(tankId: string, dipCm: number, newVolume: number): void {
     const tanks = this.getTanks();
     const updated = tanks.map(t => {
@@ -1101,6 +1197,34 @@ class StorageService {
 
   saveNozzles(nozzles: Nozzle[]): void {
     this.setItem(STORAGE_KEYS.NOZZLES, nozzles);
+  }
+
+  addNozzle(nozzle: Omit<Nozzle, 'id'> & { id?: string }): Nozzle {
+    const nozzles = this.getNozzles();
+    const newNozzle: Nozzle = {
+      id: nozzle.id || `noz-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      dispenserUnit: nozzle.dispenserUnit || `DU-0${Math.floor(nozzles.length / 2) + 1}`,
+      nozzleNumber: nozzle.nozzleNumber || (nozzles.length % 2) + 1,
+      name: nozzle.name || `Nozzle ${nozzles.length + 1}`,
+      fuelType: nozzle.fuelType || 'petrol',
+      tankId: nozzle.tankId || (this.getTanks()[0]?.id || 'tank-1'),
+    };
+    nozzles.push(newNozzle);
+    this.saveNozzles(nozzles);
+    return newNozzle;
+  }
+
+  updateNozzle(updatedNozzle: Nozzle): void {
+    const nozzles = this.getNozzles();
+    const updated = nozzles.map(n => (n.id === updatedNozzle.id ? updatedNozzle : n));
+    this.saveNozzles(updated);
+  }
+
+  deleteNozzle(nozzleId: string): boolean {
+    const nozzles = this.getNozzles();
+    const filtered = nozzles.filter(n => n.id !== nozzleId);
+    this.saveNozzles(filtered);
+    return true;
   }
 
   // Readings
@@ -1417,10 +1541,10 @@ class StorageService {
 
     const invoice: SubscriptionInvoice = {
       id: `inv-${Date.now()}`,
-      invoiceNumber: `PUMPPRO-INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNumber: `PUMPTALLY-INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       date: now.toISOString().split('T')[0],
       amount: totalAmount,
-      planName: `PumpPro Multi-Pump Commercial (${pumpsCount} Stations @ ₹${ratePerPump}/station/${planCycle === 'monthly' ? 'mo' : 'yr'})`,
+      planName: `PumpTally Multi-Pump Commercial (${pumpsCount} Stations @ ₹${ratePerPump}/station/${planCycle === 'monthly' ? 'mo' : 'yr'})`,
       billingPeriod: `${now.toISOString().split('T')[0]} - ${dateStr}`,
       paymentMode,
       transactionId,
@@ -1450,6 +1574,62 @@ class StorageService {
 
     this.saveSubscription(updated);
     return updated;
+  }
+
+  // Grant 30-Day Free Trial upon new petrol pump registration
+  grantFreeTrial(newPump: RegisteredPump, trialDays: number = 30): PumpSubscription {
+    const now = new Date();
+    const expiry = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+    const startDateStr = now.toISOString().split('T')[0];
+    const expiryDateStr = expiry.toISOString().split('T')[0];
+
+    const current = this.getSubscription();
+    const trialInvoice: SubscriptionInvoice = {
+      id: `inv-trial-${Date.now()}`,
+      invoiceNumber: `PUMPTALLY-TRIAL-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      date: startDateStr,
+      amount: 0,
+      planName: 'PumpTally 30-Day Free Trial (1 Station @ ₹0/month)',
+      billingPeriod: `${startDateStr} - ${expiryDateStr}`,
+      paymentMode: 'UPI / QR',
+      transactionId: 'FREE-TRIAL-30-DAYS-WELCOME',
+      status: 'Paid',
+      taxAmount: 0,
+      pumpsCount: 1,
+      ratePerPump: 0,
+    };
+
+    const trialSub: PumpSubscription = {
+      ...current,
+      id: `sub-${Date.now()}`,
+      planName: 'PumpTally 30-Day Free Trial (Full Commercial Access)',
+      pricePerPumpMonthly: 999,
+      pricePerPumpAnnual: 9990,
+      activePumpsCount: 1,
+      totalMonthlyAmount: 999,
+      totalAnnualAmount: 9990,
+      currencySymbol: '₹',
+      billingCycle: 'monthly',
+      status: 'Active',
+      startDate: startDateStr,
+      currentPeriodEnd: expiryDateStr,
+      renewalDate: expiryDateStr,
+      daysRemaining: trialDays,
+      isTrial: true,
+      autoRenew: false,
+      licensedPumpIds: [newPump.id],
+      registeredPumpId: newPump.id,
+      pumpName: newPump.stationName,
+      ownerName: newPump.ownerName,
+      ownerMobile: newPump.ownerPhone,
+      lastPaymentDate: startDateStr,
+      lastPaymentAmount: 0,
+      invoices: [trialInvoice, ...(current.invoices || [])],
+    };
+
+    this.saveSubscription(trialSub);
+    window.dispatchEvent(new Event('pumppro_data_changed'));
+    return trialSub;
   }
 
   // Registered Pumps Management (Multi-Station SaaS)
@@ -1890,6 +2070,38 @@ class StorageService {
     };
   }
 
+  // Daily Fuel Density Verification Records (Quality & Adulteration Checks)
+  getDailyDensityRecords(): DailyDensityRecord[] {
+    return this.getItem<DailyDensityRecord[]>(STORAGE_KEYS.DAILY_DENSITY_RECORDS, DEFAULT_DAILY_DENSITY_RECORDS);
+  }
+
+  saveDailyDensityRecords(records: DailyDensityRecord[]): void {
+    this.setItem(STORAGE_KEYS.DAILY_DENSITY_RECORDS, records);
+    this.persistToNeon(STORAGE_KEYS.DAILY_DENSITY_RECORDS, records);
+  }
+
+  addDailyDensityRecord(recordData: Omit<DailyDensityRecord, 'id' | 'timestamp'>): DailyDensityRecord {
+    const records = this.getDailyDensityRecords();
+    const newRecord: DailyDensityRecord = {
+      ...recordData,
+      id: `dens-${Date.now()}`,
+      timestamp: Date.now(),
+    };
+    records.unshift(newRecord);
+    this.saveDailyDensityRecords(records);
+    return newRecord;
+  }
+
+  deleteDailyDensityRecord(id: string): void {
+    const records = this.getDailyDensityRecords();
+    this.saveDailyDensityRecords(records.filter(r => r.id !== id));
+  }
+
+  getLatestDailyDensity(): DailyDensityRecord | null {
+    const records = this.getDailyDensityRecords();
+    return records.length > 0 ? records[0] : null;
+  }
+
   // Export full JSON backup
   exportBackupJSON(): string {
     const backup = {
@@ -1908,8 +2120,9 @@ class StorageService {
       reconciliations: this.getReconciliations(),
       tankerReceipts: this.getTankerReceipts(),
       stockReconciliations: this.getStockReconciliations(),
+      dailyDensityRecords: this.getDailyDensityRecords(),
       exportedAt: new Date().toISOString(),
-      app: 'PumpPro v2.4',
+      app: 'PumpTally v2.4',
     };
     return JSON.stringify(backup, null, 2);
   }
@@ -1932,6 +2145,7 @@ class StorageService {
       if (data.reconciliations) this.setItem(STORAGE_KEYS.RECONCILIATIONS, data.reconciliations);
       if (data.tankerReceipts) this.saveTankerReceipts(data.tankerReceipts);
       if (data.stockReconciliations) this.saveStockReconciliations(data.stockReconciliations);
+      if (data.dailyDensityRecords) this.saveDailyDensityRecords(data.dailyDensityRecords);
       window.dispatchEvent(new Event('pumppro_data_changed'));
       return true;
     } catch (e) {

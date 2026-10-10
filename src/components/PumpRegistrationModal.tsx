@@ -99,7 +99,7 @@ export const PumpRegistrationModal: React.FC<PumpRegistrationModalProps> = ({
             Register New Petrol Pump
           </h2>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Add a new petrol pump station to your PumpPro network. Standard SaaS subscription: ₹999/month.
+            Add a new petrol pump station to your PumpTally network. Standard SaaS subscription: ₹999/month.
           </p>
         </div>
 
